@@ -1,0 +1,547 @@
+<div id="estadisticasConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
+
+    <style>
+        #estadisticasConfigPage .tabButton {
+            background: #303030;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 0.5em 1em;
+            cursor: pointer;
+            margin-right: 0.4em;
+            font-size: 0.95em;
+        }
+        #estadisticasConfigPage .tabButton.active {
+            background: #00a4dc;
+            border-color: #00a4dc;
+        }
+        #estadisticasConfigPage .tabPanel {
+            display: none;
+            margin-top: 1.5em;
+        }
+        #estadisticasConfigPage .tabPanel.active {
+            display: block;
+        }
+        #estadisticasConfigPage .selectContainer select,
+        #estadisticasConfigPage .inputContainer input {
+            background: #101010 !important;
+            color: #ccc !important;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 0.5em 0.7em;
+            width: 100%;
+            font-size: inherit;
+        }
+        #estadisticasConfigPage button.emby-button.raised {
+            background: #303030;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 0.5em 1em;
+            cursor: pointer;
+        }
+        #estadisticasConfigPage button.emby-button.raised.btn-primary {
+            background: #00a4dc;
+            border-color: #00a4dc;
+        }
+        #estadisticasConfigPage button.emby-button.raised.btn-danger {
+            background: #c0392b;
+            border-color: #e74c3c;
+        }
+        #estadisticasConfigPage button.emby-button.raised:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+        #estadisticasConfigPage table.statsTable {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1em;
+        }
+        #estadisticasConfigPage table.statsTable th,
+        #estadisticasConfigPage table.statsTable td {
+            padding: 0.45em 0.6em;
+            border-bottom: 1px solid #2a2a2a;
+            text-align: left;
+            font-size: 0.95em;
+        }
+        #estadisticasConfigPage table.statsTable th {
+            background: #1a1a1a;
+            color: #ccc;
+            font-weight: 600;
+        }
+        #estadisticasConfigPage table.statsTable td.rank {
+            color: #888;
+            width: 3em;
+            text-align: right;
+        }
+        #estadisticasConfigPage table.statsTable td.plays {
+            text-align: right;
+            width: 6em;
+            color: #00a4dc;
+            font-weight: 600;
+        }
+        #estadisticasConfigPage .statusBanner {
+            padding: 0.8em 1em;
+            margin-bottom: 1em;
+            border-radius: 4px;
+            display: none;
+        }
+        #estadisticasConfigPage .statusBanner.ok { background: #1e3a1e; color: #a0e0a0; display: block; }
+        #estadisticasConfigPage .statusBanner.err { background: #3a1e1e; color: #e0a0a0; display: block; }
+        #estadisticasConfigPage .statusBanner.info { background: #1e2a3a; color: #a0c0e0; display: block; }
+        #estadisticasConfigPage .schedRow {
+            padding: 0.6em 0.4em;
+            border-bottom: 1px solid #2a2a2a;
+            display: flex;
+            align-items: center;
+            gap: 0.5em;
+            flex-wrap: wrap;
+        }
+        #estadisticasConfigPage .schedRow .name { font-weight: 600; min-width: 14em; }
+        #estadisticasConfigPage .schedRow .meta { color: #888; font-size: 0.85em; }
+    </style>
+
+    <div data-role="content">
+        <div class="content-primary">
+
+            <h1>Estadisticas</h1>
+            <p>Estadisticas de musica del plugin. La base de datos SQLite es propia y <strong>no modifica la base de datos de Jellyfin</strong>. Solo se registran reproducciones de audio (umbral 20s).</p>
+
+            <div id="estadisticasStatus" class="statusBanner"></div>
+
+            <!-- Tab navigation -->
+            <div style="margin-bottom: 1em;">
+                <button class="tabButton active" data-tab="top">Top 25 (mas escuchadas)</button>
+                <button class="tabButton" data-tab="bottom">Bottom 25 (menos escuchadas)</button>
+                <button class="tabButton" data-tab="sched">Listas programadas</button>
+            </div>
+
+            <!-- ====== TOP 25 TAB ====== -->
+            <div id="tab-top" class="tabPanel active">
+                <h2>Top 25 - Mas escuchadas</h2>
+                <p>Las consultas excluyen el periodo actual (semana/mes/ano en curso).</p>
+
+                <div class="selectContainer" style="display: flex; gap: 1em; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 12em;">
+                        <label>Dimension</label>
+                        <select id="topDimension">
+                            <option value="Songs">Canciones</option>
+                            <option value="Artists">Artistas</option>
+                            <option value="Albums">Albunes</option>
+                            <option value="Genres">Generos</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 12em;">
+                        <label>Ventana temporal</label>
+                        <select id="topWindow">
+                            <option value="2w">Ultimas 2 semanas</option>
+                            <option value="1m">Ultimo mes</option>
+                            <option value="3m">Ultimos 3 meses</option>
+                            <option value="6m">Ultimos 6 meses</option>
+                            <option value="12m" selected>Ultimos 12 meses</option>
+                            <option value="last_year">Ano anterior</option>
+                        </select>
+                    </div>
+                    <div style="flex: 0; align-self: flex-end;">
+                        <button class="emby-button raised btn-primary" id="topRefresh">Consultar</button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1em;">
+                    <input type="text" id="topPlaylistName" class="emby-input" placeholder="Nombre de la playlist a crear (opcional)" style="background:#101010;color:#ccc;border:1px solid #444;border-radius:4px;padding:0.5em 0.7em;width:100%;margin-bottom:0.5em;" />
+                    <button class="emby-button raised btn-primary" id="topCreatePlaylist">Crear playlist con estos resultados</button>
+                </div>
+
+                <div id="topResults"></div>
+            </div>
+
+            <!-- ====== BOTTOM 25 TAB ====== -->
+            <div id="tab-bottom" class="tabPanel">
+                <h2>Bottom 25 - Menos escuchadas</h2>
+                <p>Incluye canciones/artista/albumes/generos con 0 reproducciones en el periodo. El desempate es por menos reproducciones totales historicas, luego alfabetico.</p>
+
+                <div class="selectContainer" style="display: flex; gap: 1em; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 12em;">
+                        <label>Dimension</label>
+                        <select id="botDimension">
+                            <option value="Songs">Canciones</option>
+                            <option value="Artists">Artistas</option>
+                            <option value="Albums">Albunes</option>
+                            <option value="Genres">Generos</option>
+                        </select>
+                    </div>
+                    <div style="flex: 1; min-width: 12em;">
+                        <label>Ventana temporal</label>
+                        <select id="botWindow">
+                            <option value="2w">Ultimas 2 semanas</option>
+                            <option value="1m">Ultimo mes</option>
+                            <option value="3m">Ultimos 3 meses</option>
+                            <option value="6m">Ultimos 6 meses</option>
+                            <option value="12m" selected>Ultimos 12 meses</option>
+                            <option value="last_year">Ano anterior</option>
+                        </select>
+                    </div>
+                    <div style="flex: 0; align-self: flex-end;">
+                        <button class="emby-button raised btn-primary" id="botRefresh">Consultar</button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 1em;">
+                    <input type="text" id="botPlaylistName" class="emby-input" placeholder="Nombre de la playlist a crear (opcional)" style="background:#101010;color:#ccc;border:1px solid #444;border-radius:4px;padding:0.5em 0.7em;width:100%;margin-bottom:0.5em;" />
+                    <button class="emby-button raised btn-primary" id="botCreatePlaylist">Crear playlist con estos resultados</button>
+                </div>
+
+                <div id="botResults"></div>
+            </div>
+
+            <!-- ====== SCHEDULED PLAYLISTS TAB ====== -->
+            <div id="tab-sched" class="tabPanel">
+                <h2>Listas de reproduccion programadas</h2>
+                <p>Las listas programadas se regeneran y reemplazan (misma playlist) en la frecuencia indicada. La hora es hora local del servidor.</p>
+
+                <button class="emby-button raised btn-primary" id="schedNew" style="margin-bottom: 1em;">+ Nueva lista programada</button>
+                <div id="schedList"></div>
+
+                <!-- Edit/Create form (hidden by default) -->
+                <div id="schedForm" class="paperList" style="padding: 1em; margin-top: 1.5em; display: none; background: #1a1a1a; border-radius: 6px;">
+                    <h3 id="schedFormTitle" style="margin-top: 0;">Nueva lista programada</h3>
+
+                    <div class="inputContainer">
+                        <label>Nombre de la playlist</label>
+                        <input type="text" id="sfName" class="emby-input" placeholder="Ej: Top 25 Rock - Ultimo mes" />
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em;">
+                        <div class="selectContainer">
+                            <label>Tipo</label>
+                            <select id="sfDirection">
+                                <option value="Top">Top (mas escuchadas)</option>
+                                <option value="Bottom">Bottom (menos escuchadas)</option>
+                            </select>
+                        </div>
+                        <div class="selectContainer">
+                            <label>Dimension</label>
+                            <select id="sfDimension">
+                                <option value="Songs">Canciones</option>
+                                <option value="Artists">Artistas</option>
+                                <option value="Albums">Albunes</option>
+                                <option value="Genres">Generos</option>
+                            </select>
+                        </div>
+                        <div class="selectContainer">
+                            <label>Ventana temporal</label>
+                            <select id="sfWindow">
+                                <option value="2w">Ultimas 2 semanas</option>
+                                <option value="1m">Ultimo mes</option>
+                                <option value="3m">Ultimos 3 meses</option>
+                                <option value="6m">Ultimos 6 meses</option>
+                                <option value="12m" selected>Ultimos 12 meses</option>
+                                <option value="last_year">Ano anterior</option>
+                            </select>
+                        </div>
+                        <div class="inputContainer">
+                            <label>Limite (numero de canciones)</label>
+                            <input type="number" id="sfLimit" class="emby-input" value="25" min="1" max="200" />
+                        </div>
+                        <div class="selectContainer">
+                            <label>Frecuencia</label>
+                            <select id="sfFrequency" onchange="window.estadisticasSchedFreqChanged && estadisticasSchedFreqChanged()">
+                                <option value="Daily">Diaria</option>
+                                <option value="Weekly">Semanal</option>
+                                <option value="Monthly">Mensual</option>
+                                <option value="Yearly">Anual</option>
+                            </select>
+                        </div>
+                        <div class="inputContainer">
+                            <label>Hora (HH:mm, 24h)</label>
+                            <input type="time" id="sfTime" class="emby-input" value="08:00" />
+                        </div>
+                        <div class="selectContainer" id="sfDayOfWeekWrap" style="display:none;">
+                            <label>Dia de la semana</label>
+                            <select id="sfDayOfWeek">
+                                <option value="0">Lunes</option>
+                                <option value="1">Martes</option>
+                                <option value="2">Miercoles</option>
+                                <option value="3">Jueves</option>
+                                <option value="4">Viernes</option>
+                                <option value="5">Sabado</option>
+                                <option value="6">Domingo</option>
+                            </select>
+                        </div>
+                        <div class="inputContainer" id="sfDayOfMonthWrap" style="display:none;">
+                            <label>Dia del mes (1-28)</label>
+                            <input type="number" id="sfDayOfMonth" class="emby-input" value="1" min="1" max="28" />
+                        </div>
+                        <div class="inputContainer" id="sfMonthAndDayWrap" style="display:none;">
+                            <label>Fecha del ano (MM-DD)</label>
+                            <input type="text" id="sfMonthAndDay" class="emby-input" value="01-01" placeholder="MM-DD" />
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 1em; display: flex; gap: 0.5em;">
+                        <button class="emby-button raised btn-primary" id="sfSave">Guardar</button>
+                        <button class="emby-button raised" id="sfCancel">Cancelar</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+    (function () {
+        const page = document.getElementById('estadisticasConfigPage');
+        if (!page) return;
+
+        // --- Helpers ---
+        function getToken() {
+            // Read the X-Emby-Token from the URL or the dashboard's API helper
+            if (window.ApiClient && window.ApiClient.getCurrentUserId) {
+                return window.ApiClient.accessToken ? window.ApiClient.accessToken() : (window.ApiClient.serverInfo && window.ApiClient.serverInfo.AccessToken);
+            }
+            const m = /AccessToken=([a-f0-9]+)/.exec(document.cookie + ';' + location.search);
+            return m ? m[1] : '';
+        }
+        function apiUrl(path) {
+            const base = (window.ApiClient && window.ApiClient.serverAddress) ? window.ApiClient.serverAddress : '';
+            return base + '/Plugins/Estadisticas' + path;
+        }
+        async function apiGet(path) {
+            const r = await fetch(apiUrl(path), { headers: { 'X-Emby-Token': getToken() } });
+            return r.json();
+        }
+        async function apiPost(path, body, isJson) {
+            const headers = { 'X-Emby-Token': getToken() };
+            if (isJson) headers['Content-Type'] = 'application/json';
+            const r = await fetch(apiUrl(path), {
+                method: 'POST',
+                headers,
+                body: body !== undefined && body !== null ? (isJson ? JSON.stringify(body) : body) : null
+            });
+            return r.json();
+        }
+        async function apiPut(path, body) {
+            const r = await fetch(apiUrl(path), {
+                method: 'PUT',
+                headers: { 'X-Emby-Token': getToken(), 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
+            });
+            return r.json();
+        }
+        async function apiDelete(path) {
+            const r = await fetch(apiUrl(path), { method: 'DELETE', headers: { 'X-Emby-Token': getToken() } });
+            return r.json();
+        }
+
+        function showStatus(msg, kind) {
+            const el = document.getElementById('estadisticasStatus');
+            el.className = 'statusBanner ' + (kind || 'info');
+            el.textContent = msg;
+            if (kind === 'ok') setTimeout(() => { el.className = 'statusBanner'; el.textContent = ''; }, 4000);
+        }
+
+        function renderTable(rows, dimension) {
+            if (!rows || rows.length === 0) {
+                return '<p style="color:#888; font-style:italic;">Sin resultados para esta consulta.</p>';
+            }
+            const subtitleHeader = (dimension === 'Songs') ? 'Artista - Album' :
+                                   (dimension === 'Albums') ? 'Artista' : '';
+            let html = '<table class="statsTable"><thead><tr>' +
+                '<th>#</th><th>Nombre</th>' +
+                (subtitleHeader ? '<th>' + subtitleHeader + '</th>' : '') +
+                '<th>Reproducciones (periodo)</th><th>Reproducciones totales</th>' +
+                '</tr></thead><tbody>';
+            rows.forEach(r => {
+                html += '<tr>' +
+                    '<td class="rank">' + r.Rank + '</td>' +
+                    '<td>' + escapeHtml(r.Name) + '</td>' +
+                    (subtitleHeader ? '<td>' + escapeHtml(r.Subtitle || '') + '</td>' : '') +
+                    '<td class="plays">' + r.PlayCount + '</td>' +
+                    '<td>' + r.TotalPlayCount + '</td>' +
+                    '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        // --- Tab switching ---
+        page.querySelectorAll('.tabButton').forEach(btn => {
+            btn.addEventListener('click', () => {
+                page.querySelectorAll('.tabButton').forEach(b => b.classList.remove('active'));
+                page.querySelectorAll('.tabPanel').forEach(p => p.classList.remove('active'));
+                btn.classList.add('active');
+                const tab = btn.getAttribute('data-tab');
+                document.getElementById('tab-' + tab).classList.add('active');
+                if (tab === 'sched') loadScheduled();
+            });
+        });
+
+        // --- TOP 25 ---
+        async function runTop() {
+            const dim = document.getElementById('topDimension').value;
+            const win = document.getElementById('topWindow').value;
+            document.getElementById('topResults').innerHTML = '<p style="color:#888;">Consultando...</p>';
+            const r = await apiGet('/Query?dimension=' + dim + '&direction=Top&window=' + win + '&limit=25');
+            if (!r.success) {
+                showStatus('Error: ' + r.error, 'err');
+                document.getElementById('topResults').innerHTML = '';
+                return;
+            }
+            const hdr = '<p style="color:#aaa;">Periodo: ' + r.windowLabel + ' (' + r.rangeStart.substring(0,10) + ' a ' + r.rangeEnd.substring(0,10) + ')</p>';
+            document.getElementById('topResults').innerHTML = hdr + renderTable(r.rows, r.dimension);
+        }
+        document.getElementById('topRefresh').addEventListener('click', runTop);
+        document.getElementById('topCreatePlaylist').addEventListener('click', async () => {
+            const name = document.getElementById('topPlaylistName').value.trim();
+            if (!name) { showStatus('Escribe un nombre para la playlist.', 'err'); return; }
+            const dim = document.getElementById('topDimension').value;
+            const win = document.getElementById('topWindow').value;
+            showStatus('Creando playlist...', 'info');
+            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Top&window=' + win + '&limit=25');
+            if (r.success) showStatus('Playlist creada con ' + r.itemCount + ' canciones.', 'ok');
+            else showStatus('Error: ' + r.error, 'err');
+        });
+
+        // --- BOTTOM 25 ---
+        async function runBot() {
+            const dim = document.getElementById('botDimension').value;
+            const win = document.getElementById('botWindow').value;
+            document.getElementById('botResults').innerHTML = '<p style="color:#888;">Consultando...</p>';
+            const r = await apiGet('/Query?dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=25');
+            if (!r.success) {
+                showStatus('Error: ' + r.error, 'err');
+                document.getElementById('botResults').innerHTML = '';
+                return;
+            }
+            const hdr = '<p style="color:#aaa;">Periodo: ' + r.windowLabel + ' (' + r.rangeStart.substring(0,10) + ' a ' + r.rangeEnd.substring(0,10) + ')</p>';
+            document.getElementById('botResults').innerHTML = hdr + renderTable(r.rows, r.dimension);
+        }
+        document.getElementById('botRefresh').addEventListener('click', runBot);
+        document.getElementById('botCreatePlaylist').addEventListener('click', async () => {
+            const name = document.getElementById('botPlaylistName').value.trim();
+            if (!name) { showStatus('Escribe un nombre para la playlist.', 'err'); return; }
+            const dim = document.getElementById('botDimension').value;
+            const win = document.getElementById('botWindow').value;
+            showStatus('Creando playlist...', 'info');
+            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=25');
+            if (r.success) showStatus('Playlist creada con ' + r.itemCount + ' canciones.', 'ok');
+            else showStatus('Error: ' + r.error, 'err');
+        });
+
+        // --- SCHEDULED PLAYLISTS ---
+        let editingId = null;
+        window.estadisticasSchedFreqChanged = function () {
+            const f = document.getElementById('sfFrequency').value;
+            document.getElementById('sfDayOfWeekWrap').style.display = (f === 'Weekly') ? '' : 'none';
+            document.getElementById('sfDayOfMonthWrap').style.display = (f === 'Monthly') ? '' : 'none';
+            document.getElementById('sfMonthAndDayWrap').style.display = (f === 'Yearly') ? '' : 'none';
+        };
+
+        async function loadScheduled() {
+            const r = await apiGet('/ScheduledPlaylists');
+            const el = document.getElementById('schedList');
+            if (!r.success || !r.items || r.items.length === 0) {
+                el.innerHTML = '<p style="color:#888;">No hay listas programadas. Usa "+ Nueva lista programada".</p>';
+                return;
+            }
+            let html = '';
+            r.items.forEach(it => {
+                const meta = (it.QueryDirection === 'Top' ? 'Top ' : 'Bottom ') + it.Limit + ' ' + it.QueryDimension +
+                    ' / ' + it.QueryWindow + ' / ' + it.Frequency + ' @ ' + it.TimeOfDay +
+                    (it.Enabled ? '' : ' (DISABLED)');
+                html += '<div class="schedRow">' +
+                    '<span class="name">' + escapeHtml(it.Name) + '</span>' +
+                    '<span class="meta">' + escapeHtml(meta) + '</span>' +
+                    '<span style="flex:1;"></span>' +
+                    '<button class="emby-button raised" onclick="window.estadisticasSchedEdit(' + it.Id + ')">Editar</button>' +
+                    '<button class="emby-button raised" onclick="window.estadisticasSchedRun(' + it.Id + ')">Ejecutar ahora</button>' +
+                    '<button class="emby-button raised btn-danger" onclick="window.estadisticasSchedDelete(' + it.Id + ')">Borrar</button>' +
+                    '</div>';
+            });
+            el.innerHTML = html;
+        }
+
+        function openSchedForm(item) {
+            editingId = item ? item.Id : null;
+            document.getElementById('schedForm').style.display = '';
+            document.getElementById('schedFormTitle').textContent = item ? 'Editar lista programada' : 'Nueva lista programada';
+            document.getElementById('sfName').value = item ? item.Name : '';
+            document.getElementById('sfDirection').value = item ? item.QueryDirection : 'Top';
+            document.getElementById('sfDimension').value = item ? item.QueryDimension : 'Songs';
+            document.getElementById('sfWindow').value = item ? item.QueryWindow : '12m';
+            document.getElementById('sfLimit').value = item ? item.Limit : 25;
+            document.getElementById('sfFrequency').value = item ? item.Frequency : 'Daily';
+            document.getElementById('sfTime').value = item ? item.TimeOfDay : '08:00';
+            document.getElementById('sfDayOfWeek').value = item && item.DayOfWeek != null ? item.DayOfWeek : 0;
+            document.getElementById('sfDayOfMonth').value = item && item.DayOfMonth != null ? item.DayOfMonth : 1;
+            document.getElementById('sfMonthAndDay').value = item && item.MonthAndDay ? item.MonthAndDay : '01-01';
+            window.estadisticasSchedFreqChanged();
+            document.getElementById('schedForm').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        window.estadisticasSchedEdit = async function (id) {
+            const r = await apiGet('/ScheduledPlaylists');
+            if (!r.success) return;
+            const it = r.items.find(x => x.Id === id);
+            if (it) openSchedForm(it);
+        };
+        window.estadisticasSchedRun = async function (id) {
+            showStatus('Ejecutando...', 'info');
+            const r = await apiPost('/ScheduledPlaylists/' + id + '/Run');
+            if (r.success) showStatus('Ejecucion completada.', 'ok');
+            else showStatus('Error: ' + r.error, 'err');
+            loadScheduled();
+        };
+        window.estadisticasSchedDelete = async function (id) {
+            if (!confirm('Borrar esta lista programada? La playlist en Jellyfin NO se borrara.')) return;
+            const r = await apiDelete('/ScheduledPlaylists/' + id);
+            if (r.success) showStatus('Borrado.', 'ok');
+            else showStatus('Error: ' + r.error, 'err');
+            loadScheduled();
+        };
+
+        document.getElementById('schedNew').addEventListener('click', () => openSchedForm(null));
+        document.getElementById('sfCancel').addEventListener('click', () => {
+            document.getElementById('schedForm').style.display = 'none';
+            editingId = null;
+        });
+        document.getElementById('sfSave').addEventListener('click', async () => {
+            const body = {
+                Name: document.getElementById('sfName').value.trim(),
+                QueryDirection: document.getElementById('sfDirection').value,
+                QueryDimension: document.getElementById('sfDimension').value,
+                QueryWindow: document.getElementById('sfWindow').value,
+                Limit: parseInt(document.getElementById('sfLimit').value, 10) || 25,
+                Frequency: document.getElementById('sfFrequency').value,
+                TimeOfDay: document.getElementById('sfTime').value,
+                DayOfWeek: document.getElementById('sfFrequency').value === 'Weekly' ? parseInt(document.getElementById('sfDayOfWeek').value, 10) : null,
+                DayOfMonth: document.getElementById('sfFrequency').value === 'Monthly' ? parseInt(document.getElementById('sfDayOfMonth').value, 10) : null,
+                MonthAndDay: document.getElementById('sfFrequency').value === 'Yearly' ? document.getElementById('sfMonthAndDay').value : null,
+                Enabled: true
+            };
+            if (!body.Name) { showStatus('Falta el nombre.', 'err'); return; }
+            let r;
+            if (editingId == null) {
+                r = await apiPost('/ScheduledPlaylists', body, true);
+            } else {
+                r = await apiPut('/ScheduledPlaylists/' + editingId, body);
+            }
+            if (r.success) {
+                showStatus('Guardado.', 'ok');
+                document.getElementById('schedForm').style.display = 'none';
+                editingId = null;
+                loadScheduled();
+            } else {
+                showStatus('Error: ' + r.error, 'err');
+            }
+        });
+
+        // Initial load: pre-fill top results
+        runTop();
+    })();
+    </script>
+
+</div>

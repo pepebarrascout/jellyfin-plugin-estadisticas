@@ -1,0 +1,23 @@
+# .NET build artifacts
+bin/
+obj/
+*.user
+*.suo
+
+# IDE
+.vs/
+.vscode/
+.idea/
+
+# Build output
+artifacts/
+[Bb]uild/
+*.zip
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local dev config
+*.local.json
+dev/
