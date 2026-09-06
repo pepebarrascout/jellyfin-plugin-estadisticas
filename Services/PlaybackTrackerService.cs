@@ -265,7 +265,12 @@ public sealed class PlaybackTrackerService : IHostedService, IDisposable
                 ins.ExecuteNonQuery();
             }
 
-            // Insert play row
+            // Insert play row.
+            // NOTE: We do NOT save position_ms (how long the user actually listened).
+            // For future "total listening time" queries, we approximate by summing
+            // the track's full duration_ms (already captured in the tracks table).
+            // This avoids an extra column per play and keeps writes minimal —
+            // important on USB storage to reduce wear-leveling pressure.
             using (var playCmd = conn.CreateCommand())
             {
                 playCmd.Transaction = tx;

@@ -57,6 +57,18 @@ internal static class Schema
 
         // plays: one row per actual playback that met the 20-second threshold.
         // This is the central fact table; everything else is derived from it.
+        //
+        // NOTE: We deliberately do NOT capture position_ms (how many ms the user
+        // actually listened). To keep the plugin lightweight on low-power devices
+        // (e.g. Raspberry Pi with USB storage), we only store the bare minimum
+        // per play: item_id + timestamp + user + client + device.
+        //
+        // For future "total listening time" queries (e.g. "Género Rock: 38h 20m 15s
+        // en los últimos 3 meses"), we approximate using the track's full duration
+        // (SUM(tracks.duration_ms) joined to plays). This overestimates real
+        // listening time (since users may skip before the end), but avoids the
+        // extra column and the extra write per play — which matters on USB storage
+        // where each additional byte accelerates wear-leveling.
         Execute(tx,
             @"CREATE TABLE IF NOT EXISTS plays (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

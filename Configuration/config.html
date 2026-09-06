@@ -1,140 +1,43 @@
 <div id="estadisticasConfigPage" data-role="page" class="page type-interior pluginConfigurationPage">
 
-    <style>
-        #estadisticasConfigPage .tabButton {
-            background: #303030;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 0.5em 1em;
-            cursor: pointer;
-            margin-right: 0.4em;
-            font-size: 0.95em;
-        }
-        #estadisticasConfigPage .tabButton.active {
-            background: #00a4dc;
-            border-color: #00a4dc;
-        }
-        #estadisticasConfigPage .tabPanel {
-            display: none;
-            margin-top: 1.5em;
-        }
-        #estadisticasConfigPage .tabPanel.active {
-            display: block;
-        }
-        #estadisticasConfigPage .selectContainer select,
-        #estadisticasConfigPage .inputContainer input {
-            background: #101010 !important;
-            color: #ccc !important;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 0.5em 0.7em;
-            width: 100%;
-            font-size: inherit;
-        }
-        #estadisticasConfigPage button.emby-button.raised {
-            background: #303030;
-            color: #fff;
-            border: 1px solid #444;
-            border-radius: 4px;
-            padding: 0.5em 1em;
-            cursor: pointer;
-        }
-        #estadisticasConfigPage button.emby-button.raised.btn-primary {
-            background: #00a4dc;
-            border-color: #00a4dc;
-        }
-        #estadisticasConfigPage button.emby-button.raised.btn-danger {
-            background: #c0392b;
-            border-color: #e74c3c;
-        }
-        #estadisticasConfigPage button.emby-button.raised:disabled {
-            opacity: 0.5;
-            cursor: default;
-        }
-        #estadisticasConfigPage table.statsTable {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1em;
-        }
-        #estadisticasConfigPage table.statsTable th,
-        #estadisticasConfigPage table.statsTable td {
-            padding: 0.45em 0.6em;
-            border-bottom: 1px solid #2a2a2a;
-            text-align: left;
-            font-size: 0.95em;
-        }
-        #estadisticasConfigPage table.statsTable th {
-            background: #1a1a1a;
-            color: #ccc;
-            font-weight: 600;
-        }
-        #estadisticasConfigPage table.statsTable td.rank {
-            color: #888;
-            width: 3em;
-            text-align: right;
-        }
-        #estadisticasConfigPage table.statsTable td.plays {
-            text-align: right;
-            width: 6em;
-            color: #00a4dc;
-            font-weight: 600;
-        }
-        #estadisticasConfigPage .statusBanner {
-            padding: 0.8em 1em;
-            margin-bottom: 1em;
-            border-radius: 4px;
-            display: none;
-        }
-        #estadisticasConfigPage .statusBanner.ok { background: #1e3a1e; color: #a0e0a0; display: block; }
-        #estadisticasConfigPage .statusBanner.err { background: #3a1e1e; color: #e0a0a0; display: block; }
-        #estadisticasConfigPage .statusBanner.info { background: #1e2a3a; color: #a0c0e0; display: block; }
-        #estadisticasConfigPage .schedRow {
-            padding: 0.6em 0.4em;
-            border-bottom: 1px solid #2a2a2a;
-            display: flex;
-            align-items: center;
-            gap: 0.5em;
-            flex-wrap: wrap;
-        }
-        #estadisticasConfigPage .schedRow .name { font-weight: 600; min-width: 14em; }
-        #estadisticasConfigPage .schedRow .meta { color: #888; font-size: 0.85em; }
-    </style>
-
     <div data-role="content">
         <div class="content-primary">
 
             <h1>Estadísticas</h1>
-            <p>Estadísticas de música del plugin. La base de datos SQLite es propia y <strong>no modifica la base de datos de Jellyfin</strong>. Sólo se registran reproducciones de audio (umbral 20s).</p>
+            <div class="fieldDescription" style="margin-bottom: 1em;">
+                Estadísticas de música del plugin. La base de datos SQLite es propia y <strong>no modifica la base de datos de Jellyfin</strong>. Sólo se registran reproducciones de audio (umbral 20s).
+            </div>
 
-            <div id="estadisticasStatus" class="statusBanner"></div>
+            <div id="estadisticasStatus" class="paperList" style="padding: 0.8em 1em; margin-bottom: 1em; border-radius: 4px; display: none;"></div>
 
-            <!-- Tab navigation -->
-            <div style="margin-bottom: 1em;">
-                <button class="tabButton active" data-tab="top">Top 25 (más escuchadas)</button>
-                <button class="tabButton" data-tab="bottom">Bottom 25 (menos escuchadas)</button>
-                <button class="tabButton" data-tab="sched">Listas programadas</button>
-                <button class="tabButton" data-tab="debug">Debug</button>
+            <!-- Tab navigation: native Jellyfin controlgroup + emby-button -->
+            <div data-role="controlgroup" data-type="horizontal" class="localnav" style="margin-bottom: 1.5em;">
+                <a class="emby-button" href="#" data-role="button" data-tab="top">Top 25 (más escuchadas)</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="bottom">Bottom 25 (menos escuchadas)</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="sched">Listas programadas</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="debug">Debug</a>
             </div>
 
             <!-- ====== TOP 25 TAB ====== -->
-            <div id="tab-top" class="tabPanel active">
+            <div id="tab-top" class="page-content">
                 <h2>Top 25 — Más escuchadas</h2>
-                <p>Las consultas excluyen el periodo actual (semana/mes/año en curso).</p>
+                <div class="fieldDescription" style="margin-bottom: 1em;">
+                    Las consultas excluyen el periodo actual (semana/mes/año en curso).
+                </div>
 
-                <div class="selectContainer" style="display: flex; gap: 1em; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 12em;">
-                        <label>Dimensión</label>
-                        <select id="topDimension">
+                <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
+                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                        <label class="selectLabel" for="topDimension">Dimensión</label>
+                        <select is="emby-select" id="topDimension" class="emby-select-withcolor emby-select">
                             <option value="Songs">Canciones</option>
                             <option value="Artists">Artistas</option>
                             <option value="Albums">Álbumes</option>
                             <option value="Genres">Géneros</option>
                         </select>
                     </div>
-                    <div style="flex: 1; min-width: 12em;">
-                        <label>Ventana temporal</label>
-                        <select id="topWindow">
+                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                        <label class="selectLabel" for="topWindow">Ventana temporal</label>
+                        <select is="emby-select" id="topWindow" class="emby-select-withcolor emby-select">
                             <option value="2w">Últimas 2 semanas</option>
                             <option value="1m">Último mes</option>
                             <option value="3m">Últimos 3 meses</option>
@@ -143,37 +46,38 @@
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
-                    <div style="flex: 0; align-self: flex-end;">
-                        <button class="emby-button raised btn-primary" id="topRefresh">Consultar</button>
-                    </div>
+                    <button is="emby-button" type="button" class="raised button-submit block" id="topRefresh">Consultar</button>
                 </div>
 
-                <div style="margin-top: 1em;">
-                    <input type="text" id="topPlaylistName" class="emby-input" placeholder="Nombre de la playlist a crear (opcional)" style="background:#101010;color:#ccc;border:1px solid #444;border-radius:4px;padding:0.5em 0.7em;width:100%;margin-bottom:0.5em;" />
-                    <button class="emby-button raised btn-primary" id="topCreatePlaylist">Crear playlist con estos resultados</button>
+                <div class="inputContainer" style="margin-bottom: 0.5em;">
+                    <label class="inputLabel" for="topPlaylistName">Nombre de la playlist a crear (opcional)</label>
+                    <input is="emby-input" type="text" id="topPlaylistName" placeholder="Ej: Top 25 de los últimos 3 meses" />
                 </div>
+                <button is="emby-button" type="button" class="raised button-submit block" id="topCreatePlaylist">Crear playlist con estos resultados</button>
 
-                <div id="topResults"></div>
+                <div id="topResults" style="margin-top: 1.5em;"></div>
             </div>
 
             <!-- ====== BOTTOM 25 TAB ====== -->
-            <div id="tab-bottom" class="tabPanel">
+            <div id="tab-bottom" class="page-content hide">
                 <h2>Bottom 25 — Menos escuchadas</h2>
-                <p>Incluye canciones/artistas/álbumes/géneros con 0 reproducciones en el periodo. El desempate es por menos reproducciones totales históricas, luego alfabético.</p>
+                <div class="fieldDescription" style="margin-bottom: 1em;">
+                    Incluye canciones/artistas/álbumes/géneros con 0 reproducciones en el periodo. El desempate es por menos reproducciones totales históricas, luego alfabético.
+                </div>
 
-                <div class="selectContainer" style="display: flex; gap: 1em; flex-wrap: wrap;">
-                    <div style="flex: 1; min-width: 12em;">
-                        <label>Dimensión</label>
-                        <select id="botDimension">
+                <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
+                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                        <label class="selectLabel" for="botDimension">Dimensión</label>
+                        <select is="emby-select" id="botDimension" class="emby-select-withcolor emby-select">
                             <option value="Songs">Canciones</option>
                             <option value="Artists">Artistas</option>
                             <option value="Albums">Álbumes</option>
                             <option value="Genres">Géneros</option>
                         </select>
                     </div>
-                    <div style="flex: 1; min-width: 12em;">
-                        <label>Ventana temporal</label>
-                        <select id="botWindow">
+                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                        <label class="selectLabel" for="botWindow">Ventana temporal</label>
+                        <select is="emby-select" id="botWindow" class="emby-select-withcolor emby-select">
                             <option value="2w">Últimas 2 semanas</option>
                             <option value="1m">Último mes</option>
                             <option value="3m">Últimos 3 meses</option>
@@ -182,47 +86,49 @@
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
-                    <div style="flex: 0; align-self: flex-end;">
-                        <button class="emby-button raised btn-primary" id="botRefresh">Consultar</button>
-                    </div>
+                    <button is="emby-button" type="button" class="raised button-submit block" id="botRefresh">Consultar</button>
                 </div>
 
-                <div style="margin-top: 1em;">
-                    <input type="text" id="botPlaylistName" class="emby-input" placeholder="Nombre de la playlist a crear (opcional)" style="background:#101010;color:#ccc;border:1px solid #444;border-radius:4px;padding:0.5em 0.7em;width:100%;margin-bottom:0.5em;" />
-                    <button class="emby-button raised btn-primary" id="botCreatePlaylist">Crear playlist con estos resultados</button>
+                <div class="inputContainer" style="margin-bottom: 0.5em;">
+                    <label class="inputLabel" for="botPlaylistName">Nombre de la playlist a crear (opcional)</label>
+                    <input is="emby-input" type="text" id="botPlaylistName" placeholder="Ej: Bottom 25 del último mes" />
                 </div>
+                <button is="emby-button" type="button" class="raised button-submit block" id="botCreatePlaylist">Crear playlist con estos resultados</button>
 
-                <div id="botResults"></div>
+                <div id="botResults" style="margin-top: 1.5em;"></div>
             </div>
 
             <!-- ====== SCHEDULED PLAYLISTS TAB ====== -->
-            <div id="tab-sched" class="tabPanel">
+            <div id="tab-sched" class="page-content hide">
                 <h2>Listas de reproducción programadas</h2>
-                <p>Las listas programadas se regeneran y reemplazan (misma playlist) en la frecuencia indicada. La hora es hora local del servidor.</p>
+                <div class="fieldDescription" style="margin-bottom: 1em;">
+                    Las listas programadas se regeneran y reemplazan (misma playlist) sólo en el momento exacto en que llega la programación indicada. La hora es hora local del servidor.
+                </div>
 
-                <button class="emby-button raised btn-primary" id="schedNew" style="margin-bottom: 1em;">+ Nueva lista programada</button>
+                <button is="emby-button" type="button" class="raised button-submit block" id="schedNew" style="margin-bottom: 1.5em;">+ Nueva lista programada</button>
                 <div id="schedList"></div>
 
                 <!-- Edit/Create form (hidden by default) -->
-                <div id="schedForm" class="paperList" style="padding: 1em; margin-top: 1.5em; display: none; background: #1a1a1a; border-radius: 6px;">
+                <div id="schedForm" class="paperList" style="padding: 1.5em; margin-top: 1.5em; display: none;">
                     <h3 id="schedFormTitle" style="margin-top: 0;">Nueva lista programada</h3>
 
                     <div class="inputContainer">
-                        <label>Nombre de la playlist</label>
-                        <input type="text" id="sfName" class="emby-input" placeholder="Ej: Top 25 Rock — Último mes" />
+                        <label class="inputLabel" for="sfName">Nombre de la playlist</label>
+                        <input is="emby-input" type="text" id="sfName" placeholder="Ej: Top 25 Rock — Último mes" />
+                        <div class="fieldDescription">El nombre que tendrá la playlist en Jellyfin.</div>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em;">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin-top: 1em;">
                         <div class="selectContainer">
-                            <label>Tipo</label>
-                            <select id="sfDirection">
+                            <label class="selectLabel" for="sfDirection">Tipo</label>
+                            <select is="emby-select" id="sfDirection" class="emby-select-withcolor emby-select">
                                 <option value="Top">Top (más escuchadas)</option>
                                 <option value="Bottom">Bottom (menos escuchadas)</option>
                             </select>
                         </div>
                         <div class="selectContainer">
-                            <label>Dimensión</label>
-                            <select id="sfDimension">
+                            <label class="selectLabel" for="sfDimension">Dimensión</label>
+                            <select is="emby-select" id="sfDimension" class="emby-select-withcolor emby-select">
                                 <option value="Songs">Canciones</option>
                                 <option value="Artists">Artistas</option>
                                 <option value="Albums">Álbumes</option>
@@ -230,8 +136,8 @@
                             </select>
                         </div>
                         <div class="selectContainer">
-                            <label>Ventana temporal</label>
-                            <select id="sfWindow">
+                            <label class="selectLabel" for="sfWindow">Ventana temporal</label>
+                            <select is="emby-select" id="sfWindow" class="emby-select-withcolor emby-select">
                                 <option value="2w">Últimas 2 semanas</option>
                                 <option value="1m">Último mes</option>
                                 <option value="3m">Últimos 3 meses</option>
@@ -241,25 +147,29 @@
                             </select>
                         </div>
                         <div class="inputContainer">
-                            <label>Límite (número de canciones)</label>
-                            <input type="number" id="sfLimit" class="emby-input" value="25" min="1" max="200" />
+                            <label class="inputLabel" for="sfLimit">Límite (número de canciones)</label>
+                            <input is="emby-input" type="number" id="sfLimit" value="25" min="1" max="200" />
                         </div>
                         <div class="selectContainer">
-                            <label>Frecuencia</label>
-                            <select id="sfFrequency" onchange="window.estadisticasSchedFreqChanged && estadisticasSchedFreqChanged()">
+                            <label class="selectLabel" for="sfFrequency">Frecuencia</label>
+                            <select is="emby-select" id="sfFrequency" class="emby-select-withcolor emby-select">
                                 <option value="Daily">Diaria</option>
                                 <option value="Weekly">Semanal</option>
                                 <option value="Monthly">Mensual</option>
                                 <option value="Yearly">Anual</option>
                             </select>
+                            <div class="fieldDescription">Cada cuánto se regenera y republica la playlist.</div>
                         </div>
-                        <div class="inputContainer">
-                            <label>Hora (HH:mm, 24h)</label>
-                            <input type="time" id="sfTime" class="emby-input" value="08:00" />
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="sfTime">Hora</label>
+                            <select is="emby-select" id="sfTime" class="emby-select-withcolor emby-select">
+                                <!-- Populated by JS: 00:00, 00:15, 00:30 ... 23:45 -->
+                            </select>
+                            <div class="fieldDescription">Hora local del servidor. Intervalos de 15 minutos.</div>
                         </div>
                         <div class="selectContainer" id="sfDayOfWeekWrap" style="display:none;">
-                            <label>Día de la semana</label>
-                            <select id="sfDayOfWeek">
+                            <label class="selectLabel" for="sfDayOfWeek">Día de la semana</label>
+                            <select is="emby-select" id="sfDayOfWeek" class="emby-select-withcolor emby-select">
                                 <option value="0">Lunes</option>
                                 <option value="1">Martes</option>
                                 <option value="2">Miércoles</option>
@@ -270,50 +180,51 @@
                             </select>
                         </div>
                         <div class="inputContainer" id="sfDayOfMonthWrap" style="display:none;">
-                            <label>Día del mes (1-28)</label>
-                            <input type="number" id="sfDayOfMonth" class="emby-input" value="1" min="1" max="28" />
+                            <label class="inputLabel" for="sfDayOfMonth">Día del mes (1-28)</label>
+                            <input is="emby-input" type="number" id="sfDayOfMonth" value="1" min="1" max="28" />
+                            <div class="fieldDescription">Días 29-31 se ajustan al 28 en meses cortos.</div>
                         </div>
                         <div class="inputContainer" id="sfMonthAndDayWrap" style="display:none;">
-                            <label>Fecha del año (MM-DD)</label>
-                            <input type="text" id="sfMonthAndDay" class="emby-input" value="01-01" placeholder="MM-DD" />
+                            <label class="inputLabel" for="sfMonthAndDay">Fecha del año (MM-DD)</label>
+                            <input is="emby-input" type="text" id="sfMonthAndDay" value="01-01" placeholder="MM-DD" />
+                            <div class="fieldDescription">Ej: 12-25 para el 25 de diciembre.</div>
                         </div>
                     </div>
 
-                    <div style="margin-top: 1em; display: flex; gap: 0.5em;">
-                        <button class="emby-button raised btn-primary" id="sfSave">Guardar</button>
-                        <button class="emby-button raised" id="sfCancel">Cancelar</button>
+                    <div style="margin-top: 1.5em; display: flex; gap: 0.5em;">
+                        <button is="emby-button" type="button" class="raised button-submit block" id="sfSave">Guardar</button>
+                        <button is="emby-button" type="button" class="raised block" id="sfCancel">Cancelar</button>
                     </div>
                 </div>
             </div>
 
             <!-- ====== DEBUG TAB ====== -->
-            <div id="tab-debug" class="tabPanel">
+            <div id="tab-debug" class="page-content hide">
                 <h2>Debug y pruebas</h2>
-                <p>Herramientas para verificar que el plugin funciona correctamente sin tener que esperar 2 semanas a que se llenen las ventanas temporales con reproducciones reales.</p>
+                <div class="fieldDescription" style="margin-bottom: 1em;">
+                    Herramientas para verificar que el plugin funciona correctamente sin tener que esperar 2 semanas a que se llenen las ventanas temporales con reproducciones reales.
+                </div>
 
                 <div style="margin: 1em 0; display: flex; gap: 0.5em; flex-wrap: wrap;">
-                    <button class="emby-button raised btn-primary" id="debugRefresh">Actualizar estado</button>
-                    <button class="emby-button raised" id="debugSeed">Inyectar datos de prueba (50 canciones, ~1500 plays)</button>
-                    <button class="emby-button raised btn-danger" id="debugClear">Borrar todos los datos</button>
+                    <button is="emby-button" type="button" class="raised button-submit block" id="debugRefresh">Actualizar estado</button>
+                    <button is="emby-button" type="button" class="raised block" id="debugSeed">Inyectar datos de prueba (50 canciones, ~1500 plays)</button>
+                    <button is="emby-button" type="button" class="raised block" id="debugClear" style="background: #c0392b; color: #fff;">Borrar todos los datos</button>
                 </div>
 
                 <div id="debugStatus"></div>
 
-                <div style="margin-top: 2em; padding: 1em; background: #1a1a1a; border-radius: 6px; border: 1px solid #2a2a2a;">
+                <div class="paperList" style="margin-top: 2em; padding: 1.5em;">
                     <h3 style="margin-top: 0;">Cómo probar el plugin</h3>
-                    <ol style="color: #ccc; line-height: 1.6;">
+                    <ol style="color: inherit; line-height: 1.7;">
                         <li>Pulsa <strong>Actualizar estado</strong> para ver el estado actual de la BD del plugin.</li>
                         <li>Si todas las ventanas muestran 0 reproducciones, pulsa <strong>Inyectar datos de prueba</strong>. Se crearán 50 canciones sintéticas con ~1500 reproducciones distribuidas en todas las ventanas temporales.</li>
                         <li>Vuelve a la pestaña <strong>Top 25</strong> o <strong>Bottom 25</strong> y haz consultas. Deberían aparecer resultados en todas las ventanas.</li>
                         <li>Para probar con datos reales: reproduce canciones en Jellyfin (al menos 20 segundos cada una) y vuelve a la pestaña Debug para ver cómo aumentan los contadores por ventana.</li>
                         <li>Cuando termines las pruebas, pulsa <strong>Borrar todos los datos</strong> para limpiar la BD. Las listas programadas se conservan.</li>
                     </ol>
-                    <p style="color: #888; font-size: 0.9em; margin-top: 1em;">
-                        <strong>Nota:</strong> las canciones sintéticas usan ItemIds aleatorios que NO existen en Jellyfin.
-                        Las consultas Top/Bottom funcionarán perfectamente, pero si intentas crear una playlist
-                        desde datos sintéticos, la playlist estará vacía (las canciones no se pueden resolver en la biblioteca).
-                        Para probar la creación real de playlists, debes reproducir música real primero.
-                    </p>
+                    <div class="fieldDescription" style="margin-top: 1em;">
+                        <strong>Nota:</strong> las canciones sintéticas usan ItemIds aleatorios que NO existen en Jellyfin. Las consultas Top/Bottom funcionarán perfectamente, pero si intentas crear una playlist desde datos sintéticos, la playlist estará vacía (las canciones no se pueden resolver en la biblioteca). Para probar la creación real de playlists, debes reproducir música real primero.
+                    </div>
                 </div>
             </div>
 
@@ -325,8 +236,7 @@
         const page = document.getElementById('estadisticasConfigPage');
         if (!page) return;
 
-        // --- Date/time formatting helpers (es-GT locale, dd-MMM-yyyy + HH:MM) ---
-        // Examples: 05-Sep-2026, 20:49
+        // --- Date/time formatting (es-GT locale, dd-MMM-yyyy + HH:MM) ---
         const MONTHS_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
         function pad2(n) { return (n < 10 ? '0' : '') + n; }
         function formatDate(iso) {
@@ -342,12 +252,53 @@
             try {
                 const d = new Date(iso);
                 if (isNaN(d.getTime())) return iso;
-                // For datetime display, use local time interpretation
                 return pad2(d.getDate()) + '-' + MONTHS_ES[d.getMonth()] + '-' + d.getFullYear() + ' ' + pad2(d.getHours()) + ':' + pad2(d.getMinutes());
             } catch (e) { return iso; }
         }
 
-        // --- Helpers ---
+        // --- Time select population (smartlists pattern: 15-min intervals) ---
+        // Generates options 00:00, 00:15, 00:30 ... 23:45 formatted per user locale
+        function isLocale12Hour() {
+            try {
+                return new Intl.DateTimeFormat(navigator.language || 'en-US', { hour: 'numeric' })
+                    .resolvedOptions().hour12 === true;
+            } catch (e) { return false; }
+        }
+        function formatTimeForUser(hour, minute) {
+            const locale = navigator.language || navigator.userLanguage || 'en-US';
+            try {
+                const d = new Date();
+                d.setHours(hour, minute, 0, 0);
+                return new Intl.DateTimeFormat(locale, {
+                    hour: 'numeric', minute: '2-digit', hour12: isLocale12Hour()
+                }).format(d);
+            } catch (e) {
+                // Fallback: 24h
+                return pad2(hour) + ':' + pad2(minute);
+            }
+        }
+        function populateTimeSelect(selectEl, defaultValue) {
+            if (!selectEl) return;
+            // Strip seconds if present ("16:45:00" -> "16:45")
+            if (defaultValue && defaultValue.length > 5) defaultValue = defaultValue.substring(0, 5);
+            // Clear existing
+            selectEl.innerHTML = '';
+            for (let hour = 0; hour < 24; hour++) {
+                for (let minute = 0; minute < 60; minute += 15) {
+                    const value = pad2(hour) + ':' + pad2(minute);
+                    const label = formatTimeForUser(hour, minute);
+                    const opt = document.createElement('option');
+                    opt.value = value;
+                    opt.textContent = label;
+                    if (value === defaultValue) opt.selected = true;
+                    selectEl.appendChild(opt);
+                }
+            }
+        }
+        // Populate the time selects on load
+        populateTimeSelect(document.getElementById('sfTime'), '08:00');
+
+        // --- API helpers ---
         function getToken() {
             try {
                 if (window.ApiClient && window.ApiClient.accessToken) {
@@ -368,7 +319,6 @@
             const base = (window.ApiClient && window.ApiClient.serverAddress) ? window.ApiClient.serverAddress : '';
             return base + '/Plugins/Estadisticas' + path;
         }
-
         async function apiFetch(path, options) {
             const opts = options || {};
             opts.headers = Object.assign({ 'X-Emby-Token': getToken() }, opts.headers || {});
@@ -400,9 +350,7 @@
                     try { bodyText = await r.text(); } catch (e) {}
                     return {
                         success: false,
-                        error: 'El servidor devolvió una respuesta no-JSON (posible página de error). ' +
-                               'Revisa los logs de Jellyfin. Status: ' + r.status + '. Body preview: ' +
-                               (bodyText || '').substring(0, 200)
+                        error: 'El servidor devolvió una respuesta no-JSON (posible página de error). Revisa los logs de Jellyfin. Status: ' + r.status + '. Body preview: ' + (bodyText || '').substring(0, 200)
                     };
                 }
                 return await r.json();
@@ -417,97 +365,106 @@
             const headers = {};
             if (isJson) headers['Content-Type'] = 'application/json';
             const opts = { method: 'POST', headers };
-            if (body !== undefined && body !== null) {
-                opts.body = isJson ? JSON.stringify(body) : body;
-            }
+            if (body !== undefined && body !== null) opts.body = isJson ? JSON.stringify(body) : body;
             return apiFetch(path, opts);
         }
         async function apiPut(path, body) {
-            return apiFetch(path, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(body)
-            });
+            return apiFetch(path, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         }
         async function apiDelete(path) { return apiFetch(path, { method: 'DELETE' }); }
 
+        // --- Status banner (uses native Jellyfin paperList styling) ---
         function showStatus(msg, kind) {
             const el = document.getElementById('estadisticasStatus');
-            el.className = 'statusBanner ' + (kind || 'info');
+            const bg = kind === 'ok' ? '#1e3a1e' : kind === 'err' ? '#3a1e1e' : '#1e2a3a';
+            const fg = kind === 'ok' ? '#a0e0a0' : kind === 'err' ? '#e0a0a0' : '#a0c0e0';
+            el.style.background = bg;
+            el.style.color = fg;
+            el.style.display = 'block';
             el.textContent = msg;
-            if (kind === 'ok') setTimeout(() => { el.className = 'statusBanner'; el.textContent = ''; }, 5000);
+            if (kind === 'ok') setTimeout(() => { el.style.display = 'none'; el.textContent = ''; }, 5000);
         }
         function clearStatus() {
             const el = document.getElementById('estadisticasStatus');
-            el.className = 'statusBanner';
+            el.style.display = 'none';
             el.textContent = '';
         }
 
+        // --- Render helpers ---
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
         function renderTable(rows, dimension) {
             if (!rows || rows.length === 0) {
-                return '<div style="padding:1.2em; background:#1a1a1a; border:1px solid #2a2a2a; border-radius:6px; margin-top:1em;">' +
-                       '<p style="color:#aaa; margin:0;"><strong>Sin resultados para esta consulta.</strong></p>' +
-                       '<p style="color:#888; margin:0.5em 0 0 0; font-size:0.9em;">' +
+                return '<div class="paperList" style="padding: 1.2em; margin-top: 1em;">' +
+                       '<p style="margin: 0;"><strong>Sin resultados para esta consulta.</strong></p>' +
+                       '<div class="fieldDescription" style="margin-top: 0.5em;">' +
                        'Posibles causas:' +
-                       '<ul style="margin:0.3em 0; padding-left:1.5em;">' +
+                       '<ul style="margin: 0.3em 0; padding-left: 1.5em;">' +
                        '<li>Aún no hay reproducciones registradas en este periodo.</li>' +
                        '<li>Las reproducciones reales todavía no cumplen el umbral de 20s de escucha.</li>' +
                        '<li>La ventana temporal excluye el periodo actual (semana/mes/año en curso).</li>' +
                        '</ul>' +
                        'Tip: usa la pestaña <strong>Debug</strong> para inyectar datos de prueba y verificar que las consultas funcionan.' +
-                       '</p></div>';
+                       '</div></div>';
             }
             const subtitleHeader = (dimension === 'Songs') ? 'Artista — Álbum' :
                                    (dimension === 'Albums') ? 'Artista' : '';
-            let html = '<table class="statsTable"><thead><tr>' +
-                '<th>#</th><th>Nombre</th>' +
-                (subtitleHeader ? '<th>' + subtitleHeader + '</th>' : '') +
-                '<th>Reproducciones (periodo)</th><th>Reproducciones totales</th>' +
+            let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 1em;">' +
+                '<thead><tr>' +
+                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 3em; color: #888;">#</th>' +
+                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">Nombre</th>' +
+                (subtitleHeader ? '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">' + subtitleHeader + '</th>' : '') +
+                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 8em;">Reproducciones (periodo)</th>' +
+                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 8em;">Reproducciones totales</th>' +
                 '</tr></thead><tbody>';
             rows.forEach(r => {
                 html += '<tr>' +
-                    '<td class="rank">' + r.Rank + '</td>' +
-                    '<td>' + escapeHtml(r.Name) + '</td>' +
-                    (subtitleHeader ? '<td>' + escapeHtml(r.Subtitle || '') + '</td>' : '') +
-                    '<td class="plays">' + r.PlayCount + '</td>' +
-                    '<td>' + r.TotalPlayCount + '</td>' +
+                    '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; color: #888;">' + r.Rank + '</td>' +
+                    '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.Name) + '</td>' +
+                    (subtitleHeader ? '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.Subtitle || '') + '</td>' : '') +
+                    '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; color: #00a4dc; font-weight: 600;">' + r.PlayCount + '</td>' +
+                    '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + r.TotalPlayCount + '</td>' +
                     '</tr>';
             });
             html += '</tbody></table>';
             return html;
         }
-        function escapeHtml(s) {
-            return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-        }
 
-        // --- Tab switching ---
-        page.querySelectorAll('.tabButton').forEach(btn => {
-            btn.addEventListener('click', () => {
-                page.querySelectorAll('.tabButton').forEach(b => b.classList.remove('active'));
-                page.querySelectorAll('.tabPanel').forEach(p => p.classList.remove('active'));
-                btn.classList.add('active');
-                const tab = btn.getAttribute('data-tab');
-                document.getElementById('tab-' + tab).classList.add('active');
-                if (tab === 'sched') loadScheduled();
-                if (tab === 'debug') loadDebugStatus();
+        // --- Tab switching (native Jellyfin pattern) ---
+        function showTab(tabName) {
+            page.querySelectorAll('[data-tab]').forEach(btn => {
+                btn.classList.toggle('button-submit', btn.getAttribute('data-tab') === tabName);
+            });
+            page.querySelectorAll('.page-content').forEach(p => p.classList.add('hide'));
+            document.getElementById('tab-' + tabName).classList.remove('hide');
+            if (tabName === 'sched') loadScheduled();
+            if (tabName === 'debug') loadDebugStatus();
+        }
+        page.querySelectorAll('[data-tab]').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                showTab(btn.getAttribute('data-tab'));
             });
         });
+        // Show top tab by default
+        showTab('top');
 
         // --- TOP 25 ---
         async function runTop() {
             const dim = document.getElementById('topDimension').value;
             const win = document.getElementById('topWindow').value;
-            document.getElementById('topResults').innerHTML = '<p style="color:#888;">Consultando...</p>';
+            document.getElementById('topResults').innerHTML = '<div class="fieldDescription">Consultando...</div>';
             clearStatus();
             const r = await apiGet('/Query?dimension=' + dim + '&direction=Top&window=' + win + '&limit=25');
             if (!r || !r.success) {
                 showStatus('Error al consultar: ' + (r && r.error ? r.error : 'desconocido'), 'err');
-                document.getElementById('topResults').innerHTML = '<p style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</p>';
+                document.getElementById('topResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</div>';
                 return;
             }
-            const hdr = '<p style="color:#aaa;">Periodo: ' + escapeHtml(r.windowLabel) +
+            const hdr = '<div class="fieldDescription" style="margin-bottom: 0.5em;">Periodo: ' + escapeHtml(r.windowLabel) +
                 ' (' + formatDate(r.rangeStart) + ' a ' + formatDate(r.rangeEnd) + ') — ' +
-                r.rowCount + ' resultado(s)</p>';
+                r.rowCount + ' resultado(s)</div>';
             document.getElementById('topResults').innerHTML = hdr + renderTable(r.rows, r.dimension);
         }
         document.getElementById('topRefresh').addEventListener('click', runTop);
@@ -526,17 +483,17 @@
         async function runBot() {
             const dim = document.getElementById('botDimension').value;
             const win = document.getElementById('botWindow').value;
-            document.getElementById('botResults').innerHTML = '<p style="color:#888;">Consultando...</p>';
+            document.getElementById('botResults').innerHTML = '<div class="fieldDescription">Consultando...</div>';
             clearStatus();
             const r = await apiGet('/Query?dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=25');
             if (!r || !r.success) {
                 showStatus('Error al consultar: ' + (r && r.error ? r.error : 'desconocido'), 'err');
-                document.getElementById('botResults').innerHTML = '<p style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</p>';
+                document.getElementById('botResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</div>';
                 return;
             }
-            const hdr = '<p style="color:#aaa;">Periodo: ' + escapeHtml(r.windowLabel) +
+            const hdr = '<div class="fieldDescription" style="margin-bottom: 0.5em;">Periodo: ' + escapeHtml(r.windowLabel) +
                 ' (' + formatDate(r.rangeStart) + ' a ' + formatDate(r.rangeEnd) + ') — ' +
-                r.rowCount + ' resultado(s)</p>';
+                r.rowCount + ' resultado(s)</div>';
             document.getElementById('botResults').innerHTML = hdr + renderTable(r.rows, r.dimension);
         }
         document.getElementById('botRefresh').addEventListener('click', runBot);
@@ -553,22 +510,23 @@
 
         // --- SCHEDULED PLAYLISTS ---
         let editingId = null;
-        window.estadisticasSchedFreqChanged = function () {
+        function updateFreqFields() {
             const f = document.getElementById('sfFrequency').value;
             document.getElementById('sfDayOfWeekWrap').style.display = (f === 'Weekly') ? '' : 'none';
             document.getElementById('sfDayOfMonthWrap').style.display = (f === 'Monthly') ? '' : 'none';
             document.getElementById('sfMonthAndDayWrap').style.display = (f === 'Yearly') ? '' : 'none';
-        };
+        }
+        document.getElementById('sfFrequency').addEventListener('change', updateFreqFields);
 
         async function loadScheduled() {
             const r = await apiGet('/ScheduledPlaylists');
             const el = document.getElementById('schedList');
             if (!r || !r.success) {
-                el.innerHTML = '<p style="color:#c0392b;">Error al cargar: ' + (r && r.error ? r.error : 'desconocido') + '</p>';
+                el.innerHTML = '<div class="fieldDescription" style="color:#c0392b;">Error al cargar: ' + (r && r.error ? r.error : 'desconocido') + '</div>';
                 return;
             }
             if (!r.items || r.items.length === 0) {
-                el.innerHTML = '<p style="color:#888;">No hay listas programadas. Usa "+ Nueva lista programada".</p>';
+                el.innerHTML = '<div class="fieldDescription">No hay listas programadas. Usa "+ Nueva lista programada".</div>';
                 return;
             }
             let html = '';
@@ -578,13 +536,12 @@
                     (it.Enabled ? '' : ' (DESHABILITADA)');
                 const lastRunStr = it.LastRun ? formatDateTime(it.LastRun) : '(nunca)';
                 const nextRunStr = it.NextRun ? formatDateTime(it.NextRun) : '(no programada)';
-                html += '<div class="schedRow">' +
-                    '<span class="name">' + escapeHtml(it.Name) + '</span>' +
-                    '<span class="meta">' + escapeHtml(meta) + ' | Última: ' + lastRunStr + ' | Próxima: ' + nextRunStr + '</span>' +
-                    '<span style="flex:1;"></span>' +
-                    '<button class="emby-button raised" onclick="window.estadisticasSchedEdit(' + it.Id + ')">Editar</button>' +
-                    '<button class="emby-button raised" onclick="window.estadisticasSchedRun(' + it.Id + ')">Ejecutar ahora</button>' +
-                    '<button class="emby-button raised btn-danger" onclick="window.estadisticasSchedDelete(' + it.Id + ')">Borrar</button>' +
+                html += '<div class="paperList" style="padding: 0.7em 1em; margin-bottom: 0.5em; display: flex; align-items: center; gap: 0.5em; flex-wrap: wrap;">' +
+                    '<span style="font-weight: 600; min-width: 14em;">' + escapeHtml(it.Name) + '</span>' +
+                    '<span class="fieldDescription" style="flex: 1; min-width: 20em;">' + escapeHtml(meta) + ' | Última: ' + lastRunStr + ' | Próxima: ' + nextRunStr + '</span>' +
+                    '<button is="emby-button" type="button" class="raised" onclick="window.estadisticasSchedEdit(' + it.Id + ')">Editar</button>' +
+                    '<button is="emby-button" type="button" class="raised" onclick="window.estadisticasSchedRun(' + it.Id + ')">Ejecutar ahora</button>' +
+                    '<button is="emby-button" type="button" class="raised" style="background:#c0392b;color:#fff;" onclick="window.estadisticasSchedDelete(' + it.Id + ')">Borrar</button>' +
                     '</div>';
             });
             el.innerHTML = html;
@@ -600,11 +557,13 @@
             document.getElementById('sfWindow').value = item ? item.QueryWindow : '12m';
             document.getElementById('sfLimit').value = item ? item.Limit : 25;
             document.getElementById('sfFrequency').value = item ? item.Frequency : 'Daily';
-            document.getElementById('sfTime').value = item ? item.TimeOfDay : '08:00';
+            // Set the time select value
+            const timeVal = item ? (item.TimeOfDay || '08:00') : '08:00';
+            populateTimeSelect(document.getElementById('sfTime'), timeVal);
             document.getElementById('sfDayOfWeek').value = item && item.DayOfWeek != null ? item.DayOfWeek : 0;
             document.getElementById('sfDayOfMonth').value = item && item.DayOfMonth != null ? item.DayOfMonth : 1;
             document.getElementById('sfMonthAndDay').value = item && item.MonthAndDay ? item.MonthAndDay : '01-01';
-            window.estadisticasSchedFreqChanged();
+            updateFreqFields();
             document.getElementById('schedForm').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -650,11 +609,8 @@
             };
             if (!body.Name) { showStatus('Falta el nombre.', 'err'); return; }
             let r;
-            if (editingId == null) {
-                r = await apiPost('/ScheduledPlaylists', body, true);
-            } else {
-                r = await apiPut('/ScheduledPlaylists/' + editingId, body);
-            }
+            if (editingId == null) r = await apiPost('/ScheduledPlaylists', body, true);
+            else r = await apiPut('/ScheduledPlaylists/' + editingId, body);
             if (r && r.success) {
                 showStatus('Guardado.', 'ok');
                 document.getElementById('schedForm').style.display = 'none';
@@ -669,44 +625,47 @@
         async function loadDebugStatus() {
             const el = document.getElementById('debugStatus');
             if (!el) return;
-            el.innerHTML = '<p style="color:#888;">Cargando estado...</p>';
+            el.innerHTML = '<div class="fieldDescription">Cargando estado...</div>';
             const r = await apiGet('/Debug/Status');
             if (!r || !r.success) {
-                el.innerHTML = '<p style="color:#c0392b;">Error: ' + (r && r.error ? r.error : 'desconocido') + '</p>';
+                el.innerHTML = '<div class="fieldDescription" style="color:#c0392b;">Error: ' + (r && r.error ? r.error : 'desconocido') + '</div>';
                 return;
             }
             const s = r.status;
             if (!s.dbInitialized) {
-                el.innerHTML = '<div style="padding:1em; background:#3a1e1e; border:1px solid #e74c3c; border-radius:6px;">' +
-                    '<p style="color:#e0a0a0; margin:0;"><strong>La base de datos SQLite del plugin no se inicializó.</strong></p>' +
-                    '<p style="color:#c0a0a0; margin:0.5em 0 0 0;">' + escapeHtml(s.error || 'Error desconocido') + '</p>' +
-                    '<p style="color:#aaa; margin:0.5em 0 0 0; font-size:0.9em;">Revisa los logs de Jellyfin para ver el error original. El plugin está en modo degradado.</p>' +
+                el.innerHTML = '<div class="paperList" style="padding: 1em; background: #3a1e1e; border-left: 4px solid #e74c3c;">' +
+                    '<p style="margin: 0; color: #e0a0a0;"><strong>La base de datos SQLite del plugin no se inicializó.</strong></p>' +
+                    '<p style="margin: 0.5em 0 0 0; color: #c0a0a0;">' + escapeHtml(s.error || 'Error desconocido') + '</p>' +
+                    '<div class="fieldDescription" style="margin-top: 0.5em;">Revisa los logs de Jellyfin para ver el error original. El plugin está en modo degradado.</div>' +
                     '</div>';
                 return;
             }
             const wp = s.playsPerWindow || {};
-            let html = '<table class="statsTable"><tbody>' +
-                '<tr><th style="width:20em;">Estado de la BD</th><td style="color:#a0e0a0;">Inicializada correctamente</td></tr>' +
-                '<tr><th>Hora del servidor (UTC)</th><td>' + escapeHtml(formatDateTime(s.serverTimeUtc) || '?') + '</td></tr>' +
-                '<tr><th>Hora del servidor (local)</th><td>' + escapeHtml(formatDateTime(s.serverTimeLocal) || '?') + '</td></tr>' +
-                '<tr><th>Canciones en BD (tracks)</th><td>' + (s.tracksCount ?? '?') + '</td></tr>' +
-                '<tr><th>Asignaciones artista-canción</th><td>' + (s.trackArtistsCount ?? '?') + '</td></tr>' +
-                '<tr><th>Asignaciones género-canción</th><td>' + (s.trackGenresCount ?? '?') + '</td></tr>' +
-                '<tr><th>Reproducciones totales (plays)</th><td>' + (s.playsCount ?? '?') + '</td></tr>' +
-                '<tr><th>Listas programadas</th><td>' + (s.scheduledPlaylistsCount ?? '?') + '</td></tr>' +
-                '<tr><th>Reproducción más antigua</th><td>' + escapeHtml(s.earliestPlay ? formatDateTime(s.earliestPlay) : '(ninguna)') + '</td></tr>' +
-                '<tr><th>Reproducción más reciente</th><td>' + escapeHtml(s.latestPlay ? formatDateTime(s.latestPlay) : '(ninguna)') + '</td></tr>' +
+            let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 1em;"><tbody>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; width: 20em; background: #1a1a1a;">Estado de la BD</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; color: #a0e0a0;">Inicializada correctamente</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Hora del servidor (UTC)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(formatDateTime(s.serverTimeUtc) || '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Hora del servidor (local)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(formatDateTime(s.serverTimeLocal) || '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Canciones en BD (tracks)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.tracksCount ?? '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Asignaciones artista-canción</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.trackArtistsCount ?? '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Asignaciones género-canción</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.trackGenresCount ?? '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Reproducciones totales (plays)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.playsCount ?? '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Listas programadas</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.scheduledPlaylistsCount ?? '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Reproducción más antigua</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(s.earliestPlay ? formatDateTime(s.earliestPlay) : '(ninguna)') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Reproducción más reciente</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(s.latestPlay ? formatDateTime(s.latestPlay) : '(ninguna)') + '</td></tr>' +
                 '</tbody></table>';
-            html += '<h3 style="margin-top:1.5em;">Reproducciones por ventana temporal</h3>';
-            html += '<table class="statsTable"><thead><tr><th>Ventana</th><th>Reproducciones en ese periodo</th></tr></thead><tbody>';
+            html += '<h3 style="margin-top: 1.5em;">Reproducciones por ventana temporal</h3>';
+            html += '<table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;"><thead><tr>' +
+                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Ventana</th>' +
+                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Reproducciones en ese periodo</th>' +
+                '</tr></thead><tbody>';
             const labels = { '2w': 'Últimas 2 semanas', '1m': 'Último mes', '3m': 'Últimos 3 meses', '6m': 'Últimos 6 meses', '12m': 'Últimos 12 meses', 'last_year': 'Año anterior' };
             Object.keys(labels).forEach(k => {
                 const count = wp[k];
                 const color = count > 0 ? '#a0e0a0' : '#e0a0a0';
-                html += '<tr><td>' + labels[k] + ' (' + k + ')</td><td style="color:' + color + ';">' + (count >= 0 ? count : '?') + '</td></tr>';
+                html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + labels[k] + ' (' + k + ')</td><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; color: ' + color + ';">' + (count >= 0 ? count : '?') + '</td></tr>';
             });
             html += '</tbody></table>';
-            html += '<p style="color:#888; margin-top:1em; font-size:0.9em;">Si todas las ventanas muestran 0, el plugin no ha registrado reproducciones reales todavía. Usa el botón "Inyectar datos de prueba" para verificar que las consultas funcionan.</p>';
+            html += '<div class="fieldDescription" style="margin-top: 1em;">Si todas las ventanas muestran 0, el plugin no ha registrado reproducciones reales todavía. Usa el botón "Inyectar datos de prueba" para verificar que las consultas funcionan.</div>';
             el.innerHTML = html;
         }
         document.getElementById('debugRefresh').addEventListener('click', loadDebugStatus);

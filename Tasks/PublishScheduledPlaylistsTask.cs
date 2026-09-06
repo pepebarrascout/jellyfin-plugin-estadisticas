@@ -42,11 +42,16 @@ public sealed class PublishScheduledPlaylistsTask : IScheduledTask
 
     public IEnumerable<TaskTriggerInfo> GetDefaultTriggers()
     {
-        // Default: every 15 minutes
+        // Default: every 1 minute.
+        // The task only does a cheap DB check (SELECT WHERE next_run <= now).
+        // If nothing is due, it returns immediately. Playlists are only published
+        // at the exact moment their schedule says so (e.g. Monday 08:00), not
+        // on every tick. The 1-minute granularity makes the actual publish time
+        // accurate to within ~60 seconds of the configured schedule.
         yield return new TaskTriggerInfo
         {
             Type = TaskTriggerInfoType.IntervalTrigger,
-            IntervalTicks = TimeSpan.FromMinutes(15).Ticks
+            IntervalTicks = TimeSpan.FromMinutes(1).Ticks
         };
     }
 

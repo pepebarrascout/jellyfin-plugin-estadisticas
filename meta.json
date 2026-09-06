@@ -5,9 +5,9 @@
   "overview": "Estadisticas de musica independientes: Top 25 y Bottom 25 por cancion/artista/album/genero en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. Purga automatica a los 14 meses con archivo historico anual.",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "0.0.0.5",
-  "changelog": "- NEW: Captura del año de la canción (campo ProductionYear de Jellyfin) en la tabla tracks. Reservado para uso futuro (filtrar por año, ej: 'lo más escuchado de 1982').\n- FIXED: Ortografía corregida al español de Guatemala: Álbumes, Géneros, Últimas/Últimos, Reproducción, Día, Miércoles, Sábado, Más, Aún, Todavía, Cómo, sólo, etc.\n- NEW: Formato de fechas en dd-MMM-aaaa (ej: 05-Sep-2026) en toda la UI.\n- NEW: Formato de horas en HH:MM (24h) en la pestaña de listas programadas.\n- Se mantienen en inglés las palabras técnicas: Top 25, Bottom 25, Debug, playlist, tracks, plays.",
+  "version": "0.0.0.6",
+  "changelog": "- NEW: UI reescrita con componentes nativos de Jellyfin (emby-select, emby-input, emby-button, paperList, fieldDescription, selectContainer, inputContainer). Eliminado todo el CSS custom; ahora se usa la hoja de estilos propia de Jellyfin.\n- NEW: Selector de hora con <select> y opciones cada 15 minutos (00:00, 00:15, ... 23:45), formateado segun locale del navegador (12h/24h). Patron tomado del plugin jellyfin-smartlists-plugin.\n- NEW: La tarea 'Publicar listas programadas' ahora se ejecuta cada 1 minuto (antes 15). Las playlists sólo se publican en el momento exacto en que llega su programación (ej: lunes 08:00), no cada tick. Granularidad de ~60 segundos.\n- OPTIMIZATION: No se captura position_ms (tiempo real escuchado) para minimizar I/O en Raspberry Pi con almacenamiento USB. El tiempo total escuchado se aproximará en el futuro sumando la duración total de cada canción (ya capturada en tracks.duration_ms).\n- Documentación en el código sobre la decisión de diseño (no sobrecargar el servidor).",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-09-06T03:15:00Z",
+  "timestamp": "2026-09-06T03:45:00Z",
   "imagePath": "logo.png"
 }
