@@ -77,7 +77,7 @@ internal static class Schema
                 query_dimension TEXT NOT NULL,
                 query_direction TEXT NOT NULL,
                 query_window TEXT NOT NULL,
-                limit INTEGER NOT NULL DEFAULT 25,
+                playlist_limit INTEGER NOT NULL DEFAULT 25,
                 frequency TEXT NOT NULL,
                 time_of_day TEXT NOT NULL,
                 day_of_week INTEGER,

@@ -9,8 +9,16 @@
     "imageUrl": "https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-estadisticas/main/logo.png",
     "versions": [
       {
+        "version": "0.0.0.2",
+        "changelog": "- FIXED: SQLite syntax error 'near limit' que impedia iniciar Jellyfin. La columna 'limit' de la tabla scheduled_playlists era una palabra reservada de SQL; renombrada a 'playlist_limit'.\n- FIXED: Si la inicializacion de la BD SQLite falla, el plugin se desactiva gracefulmente en lugar de tirar el servidor. Jellyfin ahora arranca aunque el plugin tenga errores.\n- Compatible con Jellyfin 10.11.0+",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-estadisticas/releases/download/v0.0.0.2/jellyfin-plugin-estadisticas_0.0.0.2.zip",
+        "checksum": "650EC180342D8685DD130899E57FFECE",
+        "timestamp": "2026-09-06T01:30:00Z"
+      },
+      {
         "version": "0.0.0.1",
-        "changelog": "- Initial release v0.0.0.1 (Alpha)\n- Captura de reproducciones de audio (umbral 20s) en SQLite propio, sin tocar la BD de Jellyfin\n- Top 25 por cancion, artista, album y genero en 6 ventanas temporales (2 semanas, 1, 3, 6 y 12 meses, y ano anterior)\n- Bottom 25 (menos escuchadas) en las mismas 6 ventanas\n- Creacion de playlists desde cualquier consulta Top/Bottom\n- Programacion de publicacion: diaria, semanal (dia de la semana), mensual (dia del mes), anual (fecha del ano)\n- Tarea programada mensual de purga de reproducciones >14 meses\n- Base de datos historica anual separada (retencion indefinida)\n- Solo audio: no registra reproducciones de video, libros, etc.\n- Multi-genero y multi-artista contados por separado\n- Semanas de lunes a domingo (excluyen la semana actual)\n- 3 pestanas en el panel de control: Top 25, Bottom 25, Listas programadas\n- 2 tareas programadas en Dashboard > Scheduled Tasks > Estadisticas",
+        "changelog": "- Initial release v0.0.0.1 (Alpha) — BROKEN: SQLite syntax error on startup. Use v0.0.0.2 or later.\n- Captura de reproducciones de audio (umbral 20s) en SQLite propio, sin tocar la BD de Jellyfin\n- Top 25 por cancion, artista, album y genero en 6 ventanas temporales\n- Bottom 25 (menos escuchadas) en las mismas 6 ventanas\n- Creacion de playlists desde cualquier consulta Top/Bottom\n- Programacion de publicacion: diaria, semanal, mensual, anual\n- Tarea programada mensual de purga de reproducciones >14 meses\n- Base de datos historica anual separada (retencion indefinida)",
         "targetAbi": "10.11.0.0",
         "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-estadisticas/releases/download/v0.0.0.1/jellyfin-plugin-estadisticas_0.0.0.1.zip",
         "checksum": "CFC8D17218C00BB218ECEDADDE576068",

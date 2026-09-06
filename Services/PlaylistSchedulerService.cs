@@ -82,7 +82,7 @@ public sealed class PlaylistSchedulerService
         cmd.Transaction = tx;
         cmd.CommandText = @"
             INSERT INTO scheduled_playlists
-                (name, jellyfin_playlist_id, query_dimension, query_direction, query_window, limit,
+                (name, jellyfin_playlist_id, query_dimension, query_direction, query_window, playlist_limit,
                  frequency, time_of_day, day_of_week, day_of_month, month_and_day,
                  enabled, last_run, next_run, created_at, updated_at)
             VALUES
@@ -113,7 +113,7 @@ public sealed class PlaylistSchedulerService
                 query_dimension = @qd,
                 query_direction = @qdir,
                 query_window = @qw,
-                limit = @limit,
+                playlist_limit = @limit,
                 frequency = @freq,
                 time_of_day = @tod,
                 day_of_week = @dow,
@@ -281,7 +281,7 @@ public sealed class PlaylistSchedulerService
             QueryDimension = r.GetString(r.GetOrdinal("query_dimension")),
             QueryDirection = r.GetString(r.GetOrdinal("query_direction")),
             QueryWindow = r.GetString(r.GetOrdinal("query_window")),
-            Limit = r.GetInt32(r.GetOrdinal("limit")),
+            Limit = r.GetInt32(r.GetOrdinal("playlist_limit")),
             Frequency = r.GetString(r.GetOrdinal("frequency")),
             TimeOfDay = r.GetString(r.GetOrdinal("time_of_day")),
             DayOfWeek = r.IsDBNull(r.GetOrdinal("day_of_week")) ? null : r.GetInt32(r.GetOrdinal("day_of_week")),

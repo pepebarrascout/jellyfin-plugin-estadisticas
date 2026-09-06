@@ -10,6 +10,7 @@ using MediaBrowser.Controller.Playlists;
 using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Controller.Session;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Estadisticas;
 
@@ -23,13 +24,26 @@ public sealed class EstadisticasPluginServiceRegistrator : IPluginServiceRegistr
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
         // SQLite database manager (singleton: holds connection strings, initializes schema once).
+        // CRITICAL: Initialize() is wrapped in try-catch so that a schema error never crashes
+        // Jellyfin's startup. If initialization fails, the plugin is degraded (queries will throw)
+        // but the server keeps running. The error is logged prominently.
         serviceCollection.AddSingleton<SqliteDb>(sp =>
         {
             var appPaths = sp.GetRequiredService<IApplicationPaths>();
             var logger = sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<SqliteDb>>();
             var pluginDataPath = System.IO.Path.Combine(appPaths.DataPath, "plugins", "estadisticas");
             var db = new SqliteDb(pluginDataPath, logger);
-            db.Initialize(); // create schema on first run
+            try
+            {
+                db.Initialize(); // create schema on first run
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex,
+                    "Estadisticas: SQLite initialization FAILED. Plugin will be non-functional " +
+                    "but Jellyfin will continue. Error: {Message}", ex.Message);
+                // Do NOT rethrow — swallow so Jellyfin can start.
+            }
             return db;
         });
 
