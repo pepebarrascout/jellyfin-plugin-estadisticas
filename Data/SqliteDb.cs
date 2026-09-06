@@ -92,6 +92,13 @@ public sealed class SqliteDb : IDisposable
         }
     }
 
+    /// <summary>
+    /// True if <see cref="Initialize"/> ran successfully. Services and controllers should
+    /// check this before issuing queries, so that a failed init degrades gracefully
+    /// instead of throwing unhandled exceptions that become HTTP 500s.
+    /// </summary>
+    public bool IsInitialized => _initialized;
+
     /// <inheritdoc/>
     public void Dispose()
     {

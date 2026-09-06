@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using Jellyfin.Plugin.Estadisticas.Data;
 using Jellyfin.Plugin.Estadisticas.Models;
 using Jellyfin.Plugin.Estadisticas.Services;
 using Microsoft.AspNetCore.Mvc;
@@ -20,20 +21,41 @@ namespace Jellyfin.Plugin.Estadisticas.Api;
 public sealed class EstadisticasApiController : ControllerBase
 {
     private readonly ILogger<EstadisticasApiController> _logger;
+    private readonly SqliteDb _db;
     private readonly StatisticsService _stats;
     private readonly PlaylistSchedulerService _scheduler;
     private readonly PlaylistPublisherService _publisher;
+    private readonly DebugService _debug;
 
     public EstadisticasApiController(
         ILogger<EstadisticasApiController> logger,
+        SqliteDb db,
         StatisticsService stats,
         PlaylistSchedulerService scheduler,
-        PlaylistPublisherService publisher)
+        PlaylistPublisherService publisher,
+        DebugService debug)
     {
         _logger = logger;
+        _db = db;
         _stats = stats;
         _scheduler = scheduler;
         _publisher = publisher;
+        _debug = debug;
+    }
+
+    /// <summary>
+    /// Helper that returns a clear error if the SQLite DB failed to initialize.
+    /// All endpoints that touch the DB should call this first.
+    /// </summary>
+    private bool EnsureDbReady(out ActionResult error)
+    {
+        if (!_db.IsInitialized)
+        {
+            error = Ok(new { success = false, error = "La base de datos SQLite del plugin no se inicializo. Revisa los logs de Jellyfin para ver el error original." });
+            return false;
+        }
+        error = Ok(new { });
+        return true;
     }
 
     /// <summary>Get a Top/Bottom 25 result for the given parameters.</summary>
@@ -44,6 +66,7 @@ public sealed class EstadisticasApiController : ControllerBase
         [FromQuery] string window,
         [FromQuery] int limit = 25)
     {
+        if (!EnsureDbReady(out var err)) return err;
         try
         {
             var dim = Enum.Parse<QueryDimension>(dimension, true);
@@ -59,7 +82,8 @@ public sealed class EstadisticasApiController : ControllerBase
                 windowLabel = TimeWindow.Label(win),
                 rangeStart = TimeWindow.GetRange(win).Start.ToString("o"),
                 rangeEnd = TimeWindow.GetRange(win).End.ToString("o"),
-                rows
+                rows,
+                rowCount = rows.Count
             });
         }
         catch (Exception ex)
@@ -78,6 +102,7 @@ public sealed class EstadisticasApiController : ControllerBase
         [FromQuery] string window,
         [FromQuery] int limit = 25)
     {
+        if (!EnsureDbReady(out var err)) return err;
         try
         {
             if (string.IsNullOrWhiteSpace(name))
@@ -89,7 +114,7 @@ public sealed class EstadisticasApiController : ControllerBase
 
             var itemIds = _stats.GetItemIdsForPlaylist(dim, dir, win, limit);
             if (itemIds.Count == 0)
-                return Ok(new { success = false, error = "La consulta no produjo resultados." });
+                return Ok(new { success = false, error = "La consulta no produjo resultados. Prueba con otra ventana temporal o dimension." });
 
             var adminId = ResolveAdminId();
             if (adminId == Guid.Empty)
@@ -101,6 +126,75 @@ public sealed class EstadisticasApiController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "CreatePlaylist error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    // ====== DEBUG ENDPOINTS ======
+    // These are intended for testing and diagnostics. They let you verify the
+    // plugin is capturing plays WITHOUT having to wait 2 weeks for the smallest
+    // time window to fill up. Safe to leave enabled in production; they require
+    // admin auth just like every other endpoint.
+
+    /// <summary>
+    /// Returns diagnostic info about the plugin DB: row counts, earliest/latest
+    /// play, and per-window play counts. Useful to confirm the plugin is
+    /// actually capturing data and to understand why a query might return empty.
+    /// </summary>
+    [HttpGet("Debug/Status")]
+    public ActionResult DebugStatus()
+    {
+        try
+        {
+            var status = _debug.GetStatus();
+            return Ok(new { success = true, status });
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Inserts synthetic test data spread across all 6 time windows so you can
+    /// immediately test Top 25 / Bottom 25 queries without waiting for real
+    /// plays to accumulate.
+    ///
+    /// NOTE: The synthetic tracks use random Guids that do NOT exist in
+    /// Jellyfin's library, so creating playlists from this data will yield
+    /// empty playlists (no items resolve). This is intentional: the seed is
+    /// for testing the statistics queries, not the playlist publishing.
+    /// </summary>
+    /// <param name="tracks">Number of synthetic tracks to insert (default 50).</param>
+    /// <param name="playsPerTrack">Number of plays per track, distributed across windows (default 30).</param>
+    [HttpPost("Debug/SeedTestData")]
+    public ActionResult DebugSeed([FromQuery] int tracks = 50, [FromQuery] int playsPerTrack = 30)
+    {
+        try
+        {
+            var result = _debug.SeedTestData(tracks, playsPerTrack);
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Wipes all plays, track_artists, track_genres and tracks from the main DB.
+    /// Scheduled playlists are KEPT (the user may have configured real ones).
+    /// </summary>
+    [HttpPost("Debug/ClearAll")]
+    public ActionResult DebugClearAll()
+    {
+        try
+        {
+            var result = _debug.ClearAllPlays();
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
             return Ok(new { success = false, error = ex.Message });
         }
     }

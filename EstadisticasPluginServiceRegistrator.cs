@@ -88,6 +88,10 @@ public sealed class EstadisticasPluginServiceRegistrator : IPluginServiceRegistr
         // Historical archive service (transient).
         serviceCollection.AddTransient<HistoricalArchiveService>();
 
+        // Debug service (transient) — used by /Plugins/Estadisticas/Debug/* endpoints
+        // to inspect DB state and seed synthetic test data.
+        serviceCollection.AddTransient<DebugService>();
+
         // Playback tracker: hosted service that subscribes to playback events.
         serviceCollection.AddHostedService<PlaybackTrackerService>();
 
