@@ -57,13 +57,13 @@ public sealed class EstadisticasPlugin : BasePlugin<PluginConfiguration>, IHasWe
     public override Guid Id => PluginGuid;
 
     public override string Description =>
-        "Estadisticas de musica independientes: Top 25 y Bottom 25 por cancion, artista, album y genero " +
+        "Estadisticas de musica independientes: Top 50 y Bottom 50 por cancion, artista, album y genero " +
         "en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. " +
         "Purga automatica a los 14 meses con archivo historico anual.";
 
     /// <summary>
-    /// Returns the dashboard configuration page (single page with tabs for Top 25, Bottom 25,
-    /// and scheduled playlists). Served from the embedded resource Configuration/config.html.
+    /// Returns the dashboard configuration page (single page with tabs for Top 50, Bottom 50,
+    /// scheduled playlists and Resumen). Served from the embedded resource Configuration/config.html.
     /// </summary>
     public IEnumerable<PluginPageInfo> GetPages()
     {

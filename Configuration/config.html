@@ -12,15 +12,15 @@
 
             <!-- Tab navigation: native Jellyfin controlgroup + emby-button -->
             <div data-role="controlgroup" data-type="horizontal" class="localnav" style="margin-bottom: 1.5em;">
-                <a class="emby-button" href="#" data-role="button" data-tab="top">Top 25 (más escuchadas)</a>
-                <a class="emby-button" href="#" data-role="button" data-tab="bottom">Bottom 25 (menos escuchadas)</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="top">Top 50 (más escuchadas)</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="bottom">Bottom 50 (menos escuchadas)</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="sched">Listas programadas</a>
-                <a class="emby-button" href="#" data-role="button" data-tab="debug">Debug</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="resumen">Resumen</a>
             </div>
 
-            <!-- ====== TOP 25 TAB ====== -->
+            <!-- ====== TOP 50 TAB ====== -->
             <div id="tab-top" class="page-content">
-                <h2>Top 25 — Más escuchadas</h2>
+                <h2>Top 50 — Más escuchadas</h2>
                 <div class="fieldDescription" style="margin-bottom: 1em;">
                     Las consultas excluyen el periodo actual (semana/mes/año en curso).
                 </div>
@@ -46,23 +46,25 @@
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
-                    <button is="emby-button" type="button" class="raised button-submit block" id="topRefresh">Consultar</button>
+                    <button is="emby-button" type="button" class="raised button-submit" id="topRefresh">Consultar</button>
                 </div>
 
-                <div class="inputContainer" style="margin-bottom: 0.5em;">
-                    <label class="inputLabel" for="topPlaylistName">Nombre de la playlist a crear (opcional)</label>
-                    <input is="emby-input" type="text" id="topPlaylistName" placeholder="Ej: Top 25 de los últimos 3 meses" />
+                <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.5em;">
+                    <div class="inputContainer" style="flex: 1; min-width: 16em; margin-bottom: 0;">
+                        <label class="inputLabel" for="topPlaylistName">Nombre de la playlist a crear (opcional)</label>
+                        <input is="emby-input" type="text" id="topPlaylistName" placeholder="Ej: Top 50 de los últimos 3 meses" />
+                    </div>
+                    <button is="emby-button" type="button" class="raised button-submit" id="topCreatePlaylist" style="flex: 0 0 auto;">Crear playlist con estos resultados</button>
                 </div>
-                <button is="emby-button" type="button" class="raised button-submit block" id="topCreatePlaylist">Crear playlist con estos resultados</button>
 
                 <div id="topResults" style="margin-top: 1.5em;"></div>
             </div>
 
-            <!-- ====== BOTTOM 25 TAB ====== -->
+            <!-- ====== BOTTOM 50 TAB ====== -->
             <div id="tab-bottom" class="page-content hide">
-                <h2>Bottom 25 — Menos escuchadas</h2>
+                <h2>Bottom 50 — Menos escuchadas</h2>
                 <div class="fieldDescription" style="margin-bottom: 1em;">
-                    Incluye canciones/artistas/álbumes/géneros con 0 reproducciones en el periodo. El desempate es por menos reproducciones totales históricas, luego alfabético.
+                    Incluye canciones/artistas/álbumes/géneros con 0 reproducciones en el periodo. Desempate: menos reproducciones totales históricas y luego orden cronológico ascendente (primer registro en la base de datos).
                 </div>
 
                 <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
@@ -86,14 +88,16 @@
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
-                    <button is="emby-button" type="button" class="raised button-submit block" id="botRefresh">Consultar</button>
+                    <button is="emby-button" type="button" class="raised button-submit" id="botRefresh">Consultar</button>
                 </div>
 
-                <div class="inputContainer" style="margin-bottom: 0.5em;">
-                    <label class="inputLabel" for="botPlaylistName">Nombre de la playlist a crear (opcional)</label>
-                    <input is="emby-input" type="text" id="botPlaylistName" placeholder="Ej: Bottom 25 del último mes" />
+                <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.5em;">
+                    <div class="inputContainer" style="flex: 1; min-width: 16em; margin-bottom: 0;">
+                        <label class="inputLabel" for="botPlaylistName">Nombre de la playlist a crear (opcional)</label>
+                        <input is="emby-input" type="text" id="botPlaylistName" placeholder="Ej: Bottom 50 del último mes" />
+                    </div>
+                    <button is="emby-button" type="button" class="raised button-submit" id="botCreatePlaylist" style="flex: 0 0 auto;">Crear playlist con estos resultados</button>
                 </div>
-                <button is="emby-button" type="button" class="raised button-submit block" id="botCreatePlaylist">Crear playlist con estos resultados</button>
 
                 <div id="botResults" style="margin-top: 1.5em;"></div>
             </div>
@@ -114,26 +118,32 @@
 
                     <div class="inputContainer">
                         <label class="inputLabel" for="sfName">Nombre de la playlist</label>
-                        <input is="emby-input" type="text" id="sfName" placeholder="Ej: Top 25 Rock — Último mes" />
+                        <input is="emby-input" type="text" id="sfName" placeholder="Ej: Top 50 Rock — Último mes" />
                         <div class="fieldDescription">El nombre que tendrá la playlist en Jellyfin.</div>
                     </div>
 
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1em; margin-top: 1em;">
                         <div class="selectContainer">
-                            <label class="selectLabel" for="sfDirection">Tipo</label>
+                            <label class="selectLabel" for="sfDirection">Orden</label>
                             <select is="emby-select" id="sfDirection" class="emby-select-withcolor emby-select">
-                                <option value="Top">Top (más escuchadas)</option>
-                                <option value="Bottom">Bottom (menos escuchadas)</option>
+                                <option value="Top">Descendente — de la más escuchada a la menos escuchada</option>
+                                <option value="Bottom">Ascendente — de la menos escuchada a la más escuchada</option>
                             </select>
+                            <div class="fieldDescription">Orden en que se agregan las canciones a la playlist.</div>
                         </div>
                         <div class="selectContainer">
                             <label class="selectLabel" for="sfDimension">Dimensión</label>
                             <select is="emby-select" id="sfDimension" class="emby-select-withcolor emby-select">
                                 <option value="Songs">Canciones</option>
-                                <option value="Artists">Artistas</option>
-                                <option value="Albums">Álbumes</option>
                                 <option value="Genres">Géneros</option>
                             </select>
+                        </div>
+                        <div class="selectContainer" id="sfGenreWrap" style="display:none;">
+                            <label class="selectLabel" for="sfGenre">Género musical</label>
+                            <select is="emby-select" id="sfGenre" class="emby-select-withcolor emby-select">
+                                <option value="">(Todos)</option>
+                            </select>
+                            <div class="fieldDescription">Se generará con las canciones de ese género. Ej: Rock.</div>
                         </div>
                         <div class="selectContainer">
                             <label class="selectLabel" for="sfWindow">Ventana temporal</label>
@@ -148,7 +158,7 @@
                         </div>
                         <div class="inputContainer">
                             <label class="inputLabel" for="sfLimit">Límite (número de canciones)</label>
-                            <input is="emby-input" type="number" id="sfLimit" value="25" min="1" max="200" />
+                            <input is="emby-input" type="number" id="sfLimit" value="50" min="1" max="200" />
                         </div>
                         <div class="selectContainer">
                             <label class="selectLabel" for="sfFrequency">Frecuencia</label>
@@ -198,32 +208,21 @@
                 </div>
             </div>
 
-            <!-- ====== DEBUG TAB ====== -->
-            <div id="tab-debug" class="page-content hide">
-                <h2>Debug y pruebas</h2>
-                <div class="fieldDescription" style="margin-bottom: 1em;">
-                    Herramientas para verificar que el plugin funciona correctamente sin tener que esperar 2 semanas a que se llenen las ventanas temporales con reproducciones reales.
-                </div>
+            <!-- ====== RESUMEN TAB ====== -->
+            <div id="tab-resumen" class="page-content hide">
+                <h2>Información general</h2>
 
-                <div style="margin: 1em 0; display: flex; gap: 0.5em; flex-wrap: wrap;">
-                    <button is="emby-button" type="button" class="raised button-submit block" id="debugRefresh">Actualizar estado</button>
-                    <button is="emby-button" type="button" class="raised block" id="debugSeed">Inyectar datos de prueba (50 canciones, ~1500 plays)</button>
-                    <button is="emby-button" type="button" class="raised block" id="debugClear" style="background: #c0392b; color: #fff;">Borrar todos los datos</button>
+                <div style="margin: 1em 0;">
+                    <button is="emby-button" type="button" class="raised button-submit" id="debugRefresh">Actualizar estado</button>
                 </div>
 
                 <div id="debugStatus"></div>
 
-                <div class="paperList" style="margin-top: 2em; padding: 1.5em;">
-                    <h3 style="margin-top: 0;">Cómo probar el plugin</h3>
-                    <ol style="color: inherit; line-height: 1.7;">
-                        <li>Pulsa <strong>Actualizar estado</strong> para ver el estado actual de la BD del plugin.</li>
-                        <li>Si todas las ventanas muestran 0 reproducciones, pulsa <strong>Inyectar datos de prueba</strong>. Se crearán 50 canciones sintéticas con ~1500 reproducciones distribuidas en todas las ventanas temporales.</li>
-                        <li>Vuelve a la pestaña <strong>Top 25</strong> o <strong>Bottom 25</strong> y haz consultas. Deberían aparecer resultados en todas las ventanas.</li>
-                        <li>Para probar con datos reales: reproduce canciones en Jellyfin (al menos 20 segundos cada una) y vuelve a la pestaña Debug para ver cómo aumentan los contadores por ventana.</li>
-                        <li>Cuando termines las pruebas, pulsa <strong>Borrar todos los datos</strong> para limpiar la BD. Las listas programadas se conservan.</li>
-                    </ol>
-                    <div class="fieldDescription" style="margin-top: 1em;">
-                        <strong>Nota:</strong> las canciones sintéticas usan ItemIds aleatorios que NO existen en Jellyfin. Las consultas Top/Bottom funcionarán perfectamente, pero si intentas crear una playlist desde datos sintéticos, la playlist estará vacía (las canciones no se pueden resolver en la biblioteca). Para probar la creación real de playlists, debes reproducir música real primero.
+                <!-- Zona de riesgo: al final de toda la página para evitar pulsaciones accidentales -->
+                <div style="margin-top: 3em; padding-top: 1em; border-top: 1px solid #2a2a2a;">
+                    <button is="emby-button" type="button" class="raised" id="debugClear" style="background: #c0392b; color: #fff;">Borrar todos los datos</button>
+                    <div class="fieldDescription" style="margin-top: 0.5em;">
+                        Borra todas las reproducciones y canciones de la base de datos del plugin. Las listas programadas se conservan. Se pedirá confirmación.
                     </div>
                 </div>
             </div>
@@ -242,6 +241,9 @@
         function formatDate(iso) {
             if (!iso) return '';
             try {
+                // Date-only strings ("2026-08-31") se formatean directamente (sin aritmética de zonas)
+                const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
+                if (m) return m[3] + '-' + MONTHS_ES[(parseInt(m[2], 10) || 1) - 1] + '-' + m[1];
                 const d = new Date(iso);
                 if (isNaN(d.getTime())) return iso;
                 return pad2(d.getUTCDate()) + '-' + MONTHS_ES[d.getUTCMonth()] + '-' + d.getUTCFullYear();
@@ -405,15 +407,16 @@
                        '<li>Las reproducciones reales todavía no cumplen el umbral de 20s de escucha.</li>' +
                        '<li>La ventana temporal excluye el periodo actual (semana/mes/año en curso).</li>' +
                        '</ul>' +
-                       'Tip: usa la pestaña <strong>Debug</strong> para inyectar datos de prueba y verificar que las consultas funcionan.' +
                        '</div></div>';
             }
+            const DIM_LABELS = { Songs: 'Canciones', Artists: 'Artistas', Albums: 'Álbumes', Genres: 'Géneros' };
+            const dimHeader = DIM_LABELS[dimension] || 'Nombre';
             const subtitleHeader = (dimension === 'Songs') ? 'Artista — Álbum' :
                                    (dimension === 'Albums') ? 'Artista' : '';
             let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 1em;">' +
                 '<thead><tr>' +
                 '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 3em; color: #888;">#</th>' +
-                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">Nombre</th>' +
+                '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">' + dimHeader + '</th>' +
                 (subtitleHeader ? '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">' + subtitleHeader + '</th>' : '') +
                 '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 8em;">Reproducciones (periodo)</th>' +
                 '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 8em;">Reproducciones totales</th>' +
@@ -439,7 +442,7 @@
             page.querySelectorAll('.page-content').forEach(p => p.classList.add('hide'));
             document.getElementById('tab-' + tabName).classList.remove('hide');
             if (tabName === 'sched') loadScheduled();
-            if (tabName === 'debug') loadDebugStatus();
+            if (tabName === 'resumen') loadDebugStatus();
         }
         page.querySelectorAll('[data-tab]').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -456,7 +459,7 @@
             const win = document.getElementById('topWindow').value;
             document.getElementById('topResults').innerHTML = '<div class="fieldDescription">Consultando...</div>';
             clearStatus();
-            const r = await apiGet('/Query?dimension=' + dim + '&direction=Top&window=' + win + '&limit=25');
+            const r = await apiGet('/Query?dimension=' + dim + '&direction=Top&window=' + win + '&limit=50');
             if (!r || !r.success) {
                 showStatus('Error al consultar: ' + (r && r.error ? r.error : 'desconocido'), 'err');
                 document.getElementById('topResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</div>';
@@ -474,7 +477,7 @@
             const dim = document.getElementById('topDimension').value;
             const win = document.getElementById('topWindow').value;
             showStatus('Creando playlist...', 'info');
-            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Top&window=' + win + '&limit=25');
+            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Top&window=' + win + '&limit=50');
             if (r && r.success) showStatus('Playlist creada con ' + r.itemCount + ' canciones.', 'ok');
             else showStatus('Error al crear playlist: ' + (r && r.error ? r.error : 'desconocido'), 'err');
         });
@@ -485,7 +488,7 @@
             const win = document.getElementById('botWindow').value;
             document.getElementById('botResults').innerHTML = '<div class="fieldDescription">Consultando...</div>';
             clearStatus();
-            const r = await apiGet('/Query?dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=25');
+            const r = await apiGet('/Query?dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=50');
             if (!r || !r.success) {
                 showStatus('Error al consultar: ' + (r && r.error ? r.error : 'desconocido'), 'err');
                 document.getElementById('botResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</div>';
@@ -503,7 +506,7 @@
             const dim = document.getElementById('botDimension').value;
             const win = document.getElementById('botWindow').value;
             showStatus('Creando playlist...', 'info');
-            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=25');
+            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=50');
             if (r && r.success) showStatus('Playlist creada con ' + r.itemCount + ' canciones.', 'ok');
             else showStatus('Error al crear playlist: ' + (r && r.error ? r.error : 'desconocido'), 'err');
         });
@@ -518,6 +521,43 @@
         }
         document.getElementById('sfFrequency').addEventListener('change', updateFreqFields);
 
+        function updateDimFields() {
+            const d = document.getElementById('sfDimension').value;
+            document.getElementById('sfGenreWrap').style.display = (d === 'Genres') ? '' : 'none';
+        }
+        document.getElementById('sfDimension').addEventListener('change', updateDimFields);
+
+        const FREQ_LABELS = { Daily: 'Diaria', Weekly: 'Semanal', Monthly: 'Mensual', Yearly: 'Anual' };
+        const DIM_LABELS_ES = { Songs: 'Canciones', Artists: 'Artistas', Albums: 'Álbumes', Genres: 'Géneros' };
+
+        let genresCache = null;
+        async function loadGenres(force) {
+            if (genresCache && !force) return genresCache;
+            const r = await apiGet('/Genres');
+            if (r && r.success && Array.isArray(r.genres)) genresCache = r.genres;
+            else if (!genresCache) genresCache = [];
+            return genresCache;
+        }
+        async function populateGenreSelect(selected, force) {
+            const sel = document.getElementById('sfGenre');
+            if (!sel) return;
+            const genres = await loadGenres(force);
+            sel.innerHTML = '';
+            const optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = '(Todos)';
+            sel.appendChild(optAll);
+            genres.forEach(g => {
+                const o = document.createElement('option');
+                o.value = g;
+                o.textContent = g;
+                sel.appendChild(o);
+            });
+            const wanted = selected || '';
+            sel.value = wanted;
+            if (sel.value !== wanted) sel.value = ''; // el género ya no existe en la BD
+        }
+
         async function loadScheduled() {
             const r = await apiGet('/ScheduledPlaylists');
             const el = document.getElementById('schedList');
@@ -531,8 +571,11 @@
             }
             let html = '';
             r.items.forEach(it => {
-                const meta = (it.QueryDirection === 'Top' ? 'Top ' : 'Bottom ') + it.Limit + ' ' + it.QueryDimension +
-                    ' / ' + it.QueryWindow + ' / ' + it.Frequency + ' @ ' + it.TimeOfDay +
+                const orden = it.QueryDirection === 'Top' ? 'Descendente' : 'Ascendente';
+                const dimLabel = DIM_LABELS_ES[it.QueryDimension] || it.QueryDimension;
+                const meta = orden + ' — ' + it.Limit + ' ' + dimLabel +
+                    (it.QueryDimension === 'Genres' && it.Genre ? ' (' + it.Genre + ')' : '') +
+                    ' / ' + it.QueryWindow + ' / ' + (FREQ_LABELS[it.Frequency] || it.Frequency) + ' @ ' + it.TimeOfDay +
                     (it.Enabled ? '' : ' (DESHABILITADA)');
                 const lastRunStr = it.LastRun ? formatDateTime(it.LastRun) : '(nunca)';
                 const nextRunStr = it.NextRun ? formatDateTime(it.NextRun) : '(no programada)';
@@ -553,9 +596,12 @@
             document.getElementById('schedFormTitle').textContent = item ? 'Editar lista programada' : 'Nueva lista programada';
             document.getElementById('sfName').value = item ? item.Name : '';
             document.getElementById('sfDirection').value = item ? item.QueryDirection : 'Top';
-            document.getElementById('sfDimension').value = item ? item.QueryDimension : 'Songs';
+            // Artistas/Álbumes ya no se ofrecen; si una configuración vieja los usa, se muestra como Canciones.
+            const dimVal = (item && (item.QueryDimension === 'Genres' || item.QueryDimension === 'Songs')) ? item.QueryDimension : 'Songs';
+            document.getElementById('sfDimension').value = dimVal;
+            populateGenreSelect(item ? item.Genre : null, !item);
             document.getElementById('sfWindow').value = item ? item.QueryWindow : '12m';
-            document.getElementById('sfLimit').value = item ? item.Limit : 25;
+            document.getElementById('sfLimit').value = item ? item.Limit : 50;
             document.getElementById('sfFrequency').value = item ? item.Frequency : 'Daily';
             // Set the time select value
             const timeVal = item ? (item.TimeOfDay || '08:00') : '08:00';
@@ -564,6 +610,7 @@
             document.getElementById('sfDayOfMonth').value = item && item.DayOfMonth != null ? item.DayOfMonth : 1;
             document.getElementById('sfMonthAndDay').value = item && item.MonthAndDay ? item.MonthAndDay : '01-01';
             updateFreqFields();
+            updateDimFields();
             document.getElementById('schedForm').scrollIntoView({ behavior: 'smooth' });
         }
 
@@ -594,12 +641,14 @@
             editingId = null;
         });
         document.getElementById('sfSave').addEventListener('click', async () => {
+            const sfDim = document.getElementById('sfDimension').value;
             const body = {
                 Name: document.getElementById('sfName').value.trim(),
                 QueryDirection: document.getElementById('sfDirection').value,
-                QueryDimension: document.getElementById('sfDimension').value,
+                QueryDimension: sfDim,
                 QueryWindow: document.getElementById('sfWindow').value,
-                Limit: parseInt(document.getElementById('sfLimit').value, 10) || 25,
+                Genre: sfDim === 'Genres' ? (document.getElementById('sfGenre').value || null) : null,
+                Limit: parseInt(document.getElementById('sfLimit').value, 10) || 50,
                 Frequency: document.getElementById('sfFrequency').value,
                 TimeOfDay: document.getElementById('sfTime').value,
                 DayOfWeek: document.getElementById('sfFrequency').value === 'Weekly' ? parseInt(document.getElementById('sfDayOfWeek').value, 10) : null,
@@ -643,8 +692,7 @@
             const wp = s.playsPerWindow || {};
             let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 1em;"><tbody>' +
                 '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; width: 20em; background: #1a1a1a;">Estado de la BD</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; color: #a0e0a0;">Inicializada correctamente</td></tr>' +
-                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Hora del servidor (UTC)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(formatDateTime(s.serverTimeUtc) || '?') + '</td></tr>' +
-                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Hora del servidor (local)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(formatDateTime(s.serverTimeLocal) || '?') + '</td></tr>' +
+                '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Hora del servidor</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(formatDateTime(s.serverTime) || '?') + '</td></tr>' +
                 '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Canciones en BD (tracks)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.tracksCount ?? '?') + '</td></tr>' +
                 '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Asignaciones artista-canción</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.trackArtistsCount ?? '?') + '</td></tr>' +
                 '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Asignaciones género-canción</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s.trackGenresCount ?? '?') + '</td></tr>' +
@@ -665,30 +713,26 @@
                 html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + labels[k] + ' (' + k + ')</td><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; color: ' + color + ';">' + (count >= 0 ? count : '?') + '</td></tr>';
             });
             html += '</tbody></table>';
-            html += '<div class="fieldDescription" style="margin-top: 1em;">Si todas las ventanas muestran 0, el plugin no ha registrado reproducciones reales todavía. Usa el botón "Inyectar datos de prueba" para verificar que las consultas funcionan.</div>';
             el.innerHTML = html;
         }
         document.getElementById('debugRefresh').addEventListener('click', loadDebugStatus);
-        document.getElementById('debugSeed').addEventListener('click', async () => {
-            if (!confirm('Se inyectarán 50 canciones sintéticas con ~1500 reproducciones distribuidas en todas las ventanas temporales. Las canciones NO existen en Jellyfin (son sólo para probar las consultas). ¿Continuar?')) return;
-            showStatus('Inyectando datos de prueba...', 'info');
-            const r = await apiPost('/Debug/SeedTestData?tracks=50&playsPerTrack=30');
-            if (r && r.success) {
-                showStatus('Inyectadas ' + r.tracksInserted + ' canciones y ' + r.playsInserted + ' reproducciones.', 'ok');
-                loadDebugStatus();
-            } else {
-                showStatus('Error: ' + (r && r.error ? r.error : 'desconocido'), 'err');
-            }
-        });
-        document.getElementById('debugClear').addEventListener('click', async () => {
-            if (!confirm('¿Borrar TODAS las reproducciones y canciones de la BD del plugin? Las listas programadas se conservan. Esto no se puede deshacer.')) return;
-            showStatus('Borrando...', 'info');
-            const r = await apiPost('/Debug/ClearAll');
-            if (r && r.success) {
-                showStatus('Borrado: ' + r.deletedPlays + ' plays, ' + r.deletedTracks + ' tracks.', 'ok');
-                loadDebugStatus();
-            } else {
-                showStatus('Error: ' + (r && r.error ? r.error : 'desconocido'), 'err');
+        document.getElementById('debugClear').addEventListener('click', () => {
+            const doClear = async () => {
+                showStatus('Borrando...', 'info');
+                const r = await apiPost('/Debug/ClearAll');
+                if (r && r.success) {
+                    showStatus('Borrado: ' + r.deletedPlays + ' plays, ' + r.deletedTracks + ' tracks.', 'ok');
+                    loadDebugStatus();
+                } else {
+                    showStatus('Error: ' + (r && r.error ? r.error : 'desconocido'), 'err');
+                }
+            };
+            const msg = '¿Borrar TODAS las reproducciones y canciones de la base de datos del plugin? Las listas programadas se conservan. Esto no se puede deshacer.';
+            // Confirmación con el diálogo nativo de Jellyfin (Dashboard.confirm); respaldo: confirm() del navegador.
+            if (window.Dashboard && typeof Dashboard.confirm === 'function') {
+                Dashboard.confirm(msg, 'Borrar todos los datos', function (ok) { if (ok) doClear(); });
+            } else if (confirm(msg)) {
+                doClear();
             }
         });
 

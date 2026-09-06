@@ -58,13 +58,13 @@ public sealed class EstadisticasApiController : ControllerBase
         return true;
     }
 
-    /// <summary>Get a Top/Bottom 25 result for the given parameters.</summary>
+    /// <summary>Get a Top/Bottom 50 result for the given parameters.</summary>
     [HttpGet("Query")]
     public ActionResult Query(
         [FromQuery] string dimension,
         [FromQuery] string direction,
         [FromQuery] string window,
-        [FromQuery] int limit = 25)
+        [FromQuery] int limit = 50)
     {
         if (!EnsureDbReady(out var err)) return err;
         try
@@ -73,6 +73,9 @@ public sealed class EstadisticasApiController : ControllerBase
             var dir = Enum.Parse<QueryDirection>(direction, true);
             var win = TimeWindow.ParseCode(window);
             var rows = _stats.Query(dim, dir, win, limit);
+            // INCLUSIVE display boundaries (server-local dates) shown in the UI,
+            // e.g. "01-Ago-2026 a 31-Ago-2026" (the internal SQL range stays half-open).
+            var (displayStart, displayEnd) = TimeWindow.GetDisplayRange(win);
             return Ok(new
             {
                 success = true,
@@ -80,8 +83,8 @@ public sealed class EstadisticasApiController : ControllerBase
                 direction = dir.ToString(),
                 window = TimeWindow.Code(win),
                 windowLabel = TimeWindow.Label(win),
-                rangeStart = TimeWindow.GetRange(win).Start.ToString("o"),
-                rangeEnd = TimeWindow.GetRange(win).End.ToString("o"),
+                rangeStart = displayStart.ToString("yyyy-MM-dd"),
+                rangeEnd = displayEnd.ToString("yyyy-MM-dd"),
                 rows,
                 rowCount = rows.Count
             });
@@ -100,7 +103,7 @@ public sealed class EstadisticasApiController : ControllerBase
         [FromQuery] string dimension,
         [FromQuery] string direction,
         [FromQuery] string window,
-        [FromQuery] int limit = 25)
+        [FromQuery] int limit = 50)
     {
         if (!EnsureDbReady(out var err)) return err;
         try
@@ -130,16 +133,9 @@ public sealed class EstadisticasApiController : ControllerBase
         }
     }
 
-    // ====== DEBUG ENDPOINTS ======
-    // These are intended for testing and diagnostics. They let you verify the
-    // plugin is capturing plays WITHOUT having to wait 2 weeks for the smallest
-    // time window to fill up. Safe to leave enabled in production; they require
-    // admin auth just like every other endpoint.
-
     /// <summary>
-    /// Returns diagnostic info about the plugin DB: row counts, earliest/latest
-    /// play, and per-window play counts. Useful to confirm the plugin is
-    /// actually capturing data and to understand why a query might return empty.
+    /// Returns diagnostic info about the plugin DB: row counts, server time and
+    /// per-window play counts. Displayed in the "Resumen" tab.
     /// </summary>
     [HttpGet("Debug/Status")]
     public ActionResult DebugStatus()
@@ -148,32 +144,6 @@ public sealed class EstadisticasApiController : ControllerBase
         {
             var status = _debug.GetStatus();
             return Ok(new { success = true, status });
-        }
-        catch (Exception ex)
-        {
-            return Ok(new { success = false, error = ex.Message });
-        }
-    }
-
-    /// <summary>
-    /// Inserts synthetic test data spread across all 6 time windows so you can
-    /// immediately test Top 25 / Bottom 25 queries without waiting for real
-    /// plays to accumulate.
-    ///
-    /// NOTE: The synthetic tracks use random Guids that do NOT exist in
-    /// Jellyfin's library, so creating playlists from this data will yield
-    /// empty playlists (no items resolve). This is intentional: the seed is
-    /// for testing the statistics queries, not the playlist publishing.
-    /// </summary>
-    /// <param name="tracks">Number of synthetic tracks to insert (default 50).</param>
-    /// <param name="playsPerTrack">Number of plays per track, distributed across windows (default 30).</param>
-    [HttpPost("Debug/SeedTestData")]
-    public ActionResult DebugSeed([FromQuery] int tracks = 50, [FromQuery] int playsPerTrack = 30)
-    {
-        try
-        {
-            var result = _debug.SeedTestData(tracks, playsPerTrack);
-            return Ok(result);
         }
         catch (Exception ex)
         {
@@ -195,6 +165,26 @@ public sealed class EstadisticasApiController : ControllerBase
         }
         catch (Exception ex)
         {
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Distinct genres known to the plugin DB. Used by the scheduled-playlists
+    /// form so the user can pick ONE genre (e.g. "Rock") when the dimension is Genres.
+    /// </summary>
+    [HttpGet("Genres")]
+    public ActionResult GetGenres()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var genres = _stats.GetAllGenres();
+            return Ok(new { success = true, genres });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetGenres error");
             return Ok(new { success = false, error = ex.Message });
         }
     }
@@ -297,7 +287,8 @@ public sealed class EstadisticasApiController : ControllerBase
         sp.QueryDimension = string.IsNullOrWhiteSpace(dto.QueryDimension) ? nameof(QueryDimension.Songs) : dto.QueryDimension;
         sp.QueryDirection = string.IsNullOrWhiteSpace(dto.QueryDirection) ? nameof(QueryDirection.Top) : dto.QueryDirection;
         sp.QueryWindow = string.IsNullOrWhiteSpace(dto.QueryWindow) ? "12m" : dto.QueryWindow;
-        sp.Limit = dto.Limit > 0 ? dto.Limit : 25;
+        sp.Genre = string.IsNullOrWhiteSpace(dto.Genre) ? null : dto.Genre.Trim();
+        sp.Limit = dto.Limit > 0 ? dto.Limit : 50;
         sp.Frequency = string.IsNullOrWhiteSpace(dto.Frequency) ? nameof(ScheduleFrequency.Daily) : dto.Frequency;
         sp.TimeOfDay = string.IsNullOrWhiteSpace(dto.TimeOfDay) ? "08:00" : dto.TimeOfDay;
         sp.DayOfWeek = dto.DayOfWeek;
@@ -341,6 +332,7 @@ public sealed class EstadisticasApiController : ControllerBase
         public string? QueryDimension { get; set; }
         public string? QueryDirection { get; set; }
         public string? QueryWindow { get; set; }
+        public string? Genre { get; set; }
         public int Limit { get; set; }
         public string? Frequency { get; set; }
         public string? TimeOfDay { get; set; }

@@ -45,8 +45,14 @@ public sealed class ScheduledPlaylist
     /// <summary>Query window code (2w, 1m, 3m, 6m, 12m, last_year).</summary>
     public string QueryWindow { get; set; } = "12m";
 
-    /// <summary>Maximum number of items in the playlist (default 25).</summary>
-    public int Limit { get; set; } = 25;
+    /// <summary>
+    /// Optional genre filter (v0.0.0.7). When the dimension is Genres, the playlist
+    /// is generated with the songs of THIS genre (e.g. "Rock"). Null/empty = all songs.
+    /// </summary>
+    public string? Genre { get; set; }
+
+    /// <summary>Maximum number of items in the playlist (default 50).</summary>
+    public int Limit { get; set; } = 50;
 
     /// <summary>Schedule frequency.</summary>
     public string Frequency { get; set; } = nameof(ScheduleFrequency.Daily);

@@ -94,7 +94,8 @@ internal static class Schema
                 query_dimension TEXT NOT NULL,
                 query_direction TEXT NOT NULL,
                 query_window TEXT NOT NULL,
-                playlist_limit INTEGER NOT NULL DEFAULT 25,
+                genre TEXT,
+                playlist_limit INTEGER NOT NULL DEFAULT 50,
                 frequency TEXT NOT NULL,
                 time_of_day TEXT NOT NULL,
                 day_of_week INTEGER,
@@ -108,6 +109,10 @@ internal static class Schema
             );");
 
         Execute(tx, "CREATE INDEX IF NOT EXISTS idx_sched_next_run ON scheduled_playlists(enabled, next_run);");
+
+        // Migration: add 'genre' column to scheduled_playlists (v0.0.0.7) so the user
+        // can pick ONE genre (e.g. "Rock") when the dimension is Genres.
+        AddColumnIfMissing(tx, "scheduled_playlists", "genre", "TEXT");
 
         tx.Commit();
     }

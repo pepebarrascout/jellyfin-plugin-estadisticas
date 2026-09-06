@@ -82,11 +82,11 @@ public sealed class PlaylistSchedulerService
         cmd.Transaction = tx;
         cmd.CommandText = @"
             INSERT INTO scheduled_playlists
-                (name, jellyfin_playlist_id, query_dimension, query_direction, query_window, playlist_limit,
+                (name, jellyfin_playlist_id, query_dimension, query_direction, query_window, genre, playlist_limit,
                  frequency, time_of_day, day_of_week, day_of_month, month_and_day,
                  enabled, last_run, next_run, created_at, updated_at)
             VALUES
-                (@name, @jpl, @qd, @qdir, @qw, @limit,
+                (@name, @jpl, @qd, @qdir, @qw, @genre, @limit,
                  @freq, @tod, @dow, @dom, @md,
                  @en, @lr, @nr, @ca, @ua);
             SELECT last_insert_rowid();";
@@ -113,6 +113,7 @@ public sealed class PlaylistSchedulerService
                 query_dimension = @qd,
                 query_direction = @qdir,
                 query_window = @qw,
+                genre = @genre,
                 playlist_limit = @limit,
                 frequency = @freq,
                 time_of_day = @tod,
@@ -173,7 +174,19 @@ public sealed class PlaylistSchedulerService
             var dir = Enum.Parse<QueryDirection>(sp.QueryDirection, true);
             var win = TimeWindow.ParseCode(sp.QueryWindow);
 
-            var itemIds = _stats.GetItemIdsForPlaylist(dim, dir, win, sp.Limit);
+            // v0.0.0.7: scheduled lists are song-based. Dimension=Genres uses the
+            // configured genre filter (e.g. "Top 50 de Rock"). Artists/Albums are
+            // legacy (kept for old configurations, no longer offered in the UI).
+            List<string> itemIds;
+            if (dim == QueryDimension.Artists || dim == QueryDimension.Albums)
+            {
+                itemIds = _stats.GetItemIdsForPlaylist(dim, dir, win, sp.Limit);
+            }
+            else
+            {
+                var ascending = dir == QueryDirection.Bottom;
+                itemIds = _stats.GetScheduledItemIds(dim, win, sp.Limit, ascending, sp.Genre);
+            }
             var adminId = _adminUserIdProvider();
 
             var playlistId = await _publisher.PublishAsync(
@@ -281,6 +294,7 @@ public sealed class PlaylistSchedulerService
             QueryDimension = r.GetString(r.GetOrdinal("query_dimension")),
             QueryDirection = r.GetString(r.GetOrdinal("query_direction")),
             QueryWindow = r.GetString(r.GetOrdinal("query_window")),
+            Genre = r.IsDBNull(r.GetOrdinal("genre")) ? null : r.GetString(r.GetOrdinal("genre")),
             Limit = r.GetInt32(r.GetOrdinal("playlist_limit")),
             Frequency = r.GetString(r.GetOrdinal("frequency")),
             TimeOfDay = r.GetString(r.GetOrdinal("time_of_day")),
@@ -302,6 +316,7 @@ public sealed class PlaylistSchedulerService
         cmd.Parameters.AddWithValue("@qd", sp.QueryDimension);
         cmd.Parameters.AddWithValue("@qdir", sp.QueryDirection);
         cmd.Parameters.AddWithValue("@qw", sp.QueryWindow);
+        cmd.Parameters.AddWithValue("@genre", (object?)sp.Genre ?? DBNull.Value);
         cmd.Parameters.AddWithValue("@limit", sp.Limit);
         cmd.Parameters.AddWithValue("@freq", sp.Frequency);
         cmd.Parameters.AddWithValue("@tod", sp.TimeOfDay);

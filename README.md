@@ -9,7 +9,7 @@
     </p>
 </div>
 
-> **Estadísticas de música para Jellyfin**. Registra reproducciones de audio en una **base de datos SQLite propia** (sin tocar la BD de Jellyfin) y genera informes **Top 25** y **Bottom 25** por canción, artista, álbum y género en múltiples ventanas temporales. Permite crear listas de reproducción y programar su publicación de forma diaria, semanal, mensual o anual.
+> **Estadísticas de música para Jellyfin**. Registra reproducciones de audio en una **base de datos SQLite propia** (sin tocar la BD de Jellyfin) y genera informes **Top 50** y **Bottom 50** por canción, artista, álbum y género en múltiples ventanas temporales. Permite crear listas de reproducción y programar su publicación de forma diaria, semanal, mensual o anual.
 
 **Requiere Jellyfin versión `10.11.0` o superior.**
 
@@ -22,12 +22,12 @@
 | 🎵 **Solo Audio** | Registra exclusivamente reproducciones de música (no video, libros, etc.) |
 | ⏱️ **Scrobbling 20s** | Una reproducción se cuenta tras superar los 20 segundos de escucha |
 | 💾 **SQLite Propio** | Base de datos independiente. **No modifica la BD de Jellyfin** |
-| 📊 **Top 25** | Canciones, artistas, álbumes y géneros más escuchados en 6 ventanas temporales |
-| 📉 **Bottom 25** | Canciones, artistas, álbumes y géneros menos escuchados (incluye 0 reproducciones) |
+| 📊 **Top 50** | Canciones, artistas, álbumes y géneros más escuchados en 6 ventanas temporales |
+| 📉 **Bottom 50** | Canciones, artistas, álbumes y géneros menos escuchados (incluye 0 reproducciones) |
 | 🗓️ **6 Ventanas** | 2 semanas, 1, 3, 6 y 12 meses, y año anterior (todas excluyen el periodo actual) |
 | 🎼 **Multi-Género/Artista** | Una canción con `Rock; Metal` cuenta en ambos gééneros por separado |
-| 📅 **Semanas Lun-Dom** | Las semanas son de lunes a domingo (ISO 8601); la semana actual se excluye |
-| 📋 **Playlists desde Consultas** | Crea listas de reproducción desde cualquier Top/Bottom 25 |
+| 📅 **Semanas Dom-Sáb** | Las semanas van de domingo a sábado; la semana actual (en curso) se excluye |
+| 📋 **Playlists desde Consultas** | Crea listas de reproducción desde cualquier Top/Bottom 50 |
 | 🔁 **Programación de Publicación** | Diaria, semanal (día de la semana), mensual (día del mes), anual (fecha del año) |
 | ♻️ **Reemplazo In-Place** | Las playlists programadas se actualizan en la misma ID (sin duplicados) |
 | 🧹 **Purga Automática** | Elimina reproducciones con más de 14 meses una vez al mes |
@@ -42,7 +42,7 @@ Todas las consultas **excluyen el periodo actual** (semana/mes/año en curso):
 
 | Ventana | Etiqueta | Detalle |
 |---|---|---|
-| `2w` | Últimas 2 semanas | 2 semanas completas (lun-dom) previas a la semana actual |
+| `2w` | Últimas 2 semanas | 2 semanas completas (dom-sáb) previas a la semana actual |
 | `1m` | Último mes | Mes calendario anterior al actual |
 | `3m` | Últimos 3 meses | 3 meses calendario anteriores, excluyendo el actual |
 | `6m` | Últimos 6 meses | 6 meses calendario anteriores, excluyendo el actual |
@@ -97,7 +97,7 @@ Todas las consultas **excluyen el periodo actual** (semana/mes/año en curso):
 
 ## ⚙️ Configuración
 
-### Pestaña 1: Top 25 (Más Escuchadas)
+### Pestaña 1: Top 50 (Más Escuchadas)
 
 1. Navega a **Panel de Control > Plugins > Estadisticas**
 2. Selecciona la dimensión (Canciones, Artistas, Álbumes o Géneros)
@@ -107,11 +107,11 @@ Todas las consultas **excluyen el periodo actual** (semana/mes/año en curso):
    - Escribe un nombre en el campo "Nombre de la playlist a crear"
    - Haz clic en **Crear playlist con estos resultados**
 
-### Pestaña 2: Bottom 25 (Menos Escuchadas)
+### Pestaña 2: Bottom 50 (Menos Escuchadas)
 
-- Misma mecánica que Top 25 pero en orden inverso
+- Misma mecánica que Top 50 pero en orden inverso
 - **Incluye canciones/artistas/álbumes/géneros con 0 reproducciones** en el periodo
-- Desempate para empates en 0: menos reproducciones totales históricas, luego alfabético
+- Desempate: menos reproducciones totales históricas y luego orden cronológico ascendente (primer registro en la base de datos); las más antiguas primero
 - También permite crear playlists desde los resultados
 
 ### Pestaña 3: Listas Programadas
@@ -119,10 +119,11 @@ Todas las consultas **excluyen el periodo actual** (semana/mes/año en curso):
 1. Haz clic en **+ Nueva lista programada**
 2. Completa el formulario:
    - **Nombre**: Nombre de la playlist en Jellyfin
-   - **Tipo**: Top (más escuchadas) o Bottom (menos escuchadas)
-   - **Dimensión**: Canciones, Artistas, Álbumes o Géneros
+   - **Orden**: Descendente (de la más escuchada a la menos escuchada) o Ascendente (de la menos escuchada a la más escuchada)
+   - **Dimensión**: Canciones o Géneros
+   - **Género musical** (solo Géneros): El género de las canciones (ej.: Rock)
    - **Ventana temporal**: Una de las 6 disponibles
-   - **Límite**: Número máximo de canciones (default 25)
+   - **Límite**: Número máximo de canciones (default 50)
    - **Frecuencia**: Diaria, Semanal, Mensual o Anual
    - **Hora**: Hora local del servidor (formato 24h HH:mm)
    - **Día de la semana** (solo Semanal): Lunes a Domingo
@@ -182,14 +183,14 @@ Ambas tareas se pueden reconfigurar desde el dashboard de Jellyfin.
 - Revisa los logs de Jellyfin: busca mensajes `Recorded play:` del plugin
 - Solo se registran reproducciones del **usuario administrador** en esta versión
 
-### Las consultas Top 25 devuelven vacío
+### Las consultas Top 50 devuelven vacío
 - Es normal si todavía no hay suficientes reproducciones en el periodo consultado
 - Las consultas **excluyen el periodo actual** (semana/mes/año en curso)
 - Prueba con una ventana más amplia (12 meses o año anterior) para validar
 
-### Las Bottom 25 muestran canciones que sí he escuchado
+### Las Bottom 50 muestran canciones que sí he escuchado
 - Es el comportamiento esperado. Una canción puede tener muchas reproducciones totales pero 0 en el periodo consultado
-- El desempate para empates en 0 es: menos reproducciones totales históricas → luego alfabético
+- El desempate es: menos reproducciones totales históricas → luego orden cronológico ascendente (primer registro en la base de datos)
 
 ### Las playlists programadas no se publican
 - Verifica que la tarea **"Publicar listas de reproducción programadas"** esté habilitada
@@ -242,7 +243,7 @@ El archivo `.dll` resultante se copia a la carpeta de plugins de Jellyfin junto 
 | `Data/SqliteDb.cs` | Gestión de conexiones a las dos BDs SQLite (main + histórica) |
 | `Data/Schema.cs` | Creación de esquemas (tablas e índices) |
 | `Services/PlaybackTrackerService.cs` | Servicio en segundo plano que captura reproducciones (≥20s, audio only) |
-| `Services/StatisticsService.cs` | Consultas Top 25 / Bottom 25 SQL por dimensión y ventana |
+| `Services/StatisticsService.cs` | Consultas Top 50 / Bottom 50 SQL por dimensión y ventana |
 | `Services/PlaylistPublisherService.cs` | Creación/actualización de playlists en Jellyfin (in-place) |
 | `Services/PlaylistSchedulerService.cs` | CRUD + cómputo de next_run para listas programadas |
 | `Services/HistoricalArchiveService.cs` | Purga mensual (>14 meses) + agregados anuales |
@@ -264,10 +265,10 @@ El archivo `.dll` resultante se copia a la carpeta de plugins de Jellyfin junto 
 - **Solo usuario admin**: el plugin captura y muestra estadísticas del admin. No hay filtrado por usuario en esta versión.
 - **"Reproducción válida" = posición ≥ 20s** del item de audio. No requiere completar la canción.
 - **Multi-género y multi-artista**: una canción con `Rock; Metal` cuenta en ambos géneros por separado. Una canción con `Artist A feat. Artist B` cuenta en ambos artistas por separado.
-- **Semanas = lun-dom** (ISO 8601). La "semana actual" se excluye de las consultas de 2 semanas.
+- **Semanas = dom-sáb**. La "semana actual" (aunque esté en curso desde el domingo) se excluye de las consultas de 2 semanas; se muestran las dos últimas semanas completas.
 - **"Último año"** = año calendario anterior completo (ej.: en 2025 sería todo 2024).
 - **"Últimos 12 meses"** = ventana móvil de 12 meses calendario anteriores, excluyendo el mes actual.
-- **Bottom 25**: el desempate para empates en 0 reproducciones es `total_plays ASC, name ASC` para que el ranking sea estable y reproducible.
+- **Bottom 50**: el desempate es `total_plays ASC, first_seen ASC` (menos reproducciones históricas y luego orden cronológico ascendente por el primer registro en la base de datos) para que el ranking sea estable y reproducible.
 - **Playlists desde Artistas/Álbumes/Géneros**: al crear una playlist desde una consulta de dimensión agregada, el plugin resuelve la canción más representativa de cada entidad (la más reproducida en el periodo para Top, la menos para Bottom) y la añade. No duplica canciones entre entidades.
 
 ---

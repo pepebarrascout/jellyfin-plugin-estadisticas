@@ -8,14 +8,15 @@ using Jellyfin.Plugin.Estadisticas.Models;
 namespace Jellyfin.Plugin.Estadisticas.Services;
 
 /// <summary>
-/// Runs Top 25 and Bottom 25 queries against the plugin's SQLite DB.
+/// Runs Top 50 and Bottom 50 queries against the plugin's SQLite DB.
 /// All windows exclude the current period (current week / month / year).
 ///
 /// Bottom queries use LEFT JOIN to include tracks/artists/genres/albums with 0 plays in
-/// the window. Tie-breaking for Bottom:
+/// the window. Tie-breaking for Bottom (v0.0.0.7):
 ///   1. period_plays ASC
-///   2. total_plays ASC
-///   3. name ASC
+///   2. total_plays ASC (historic)
+///   3. first_seen ASC  (chronological: the oldest track in the DB ranks first)
+///   4. name ASC (deterministic last resort)
 /// This makes the ranking stable and reproducible.
 /// </summary>
 public sealed class StatisticsService
@@ -30,13 +31,13 @@ public sealed class StatisticsService
     }
 
     /// <summary>
-    /// Run a Top/Bottom 25 query.
+    /// Run a Top/Bottom 50 query.
     /// </summary>
     public List<QueryResultRow> Query(
         QueryDimension dimension,
         QueryDirection direction,
         QueryWindow window,
-        int limit = 25)
+        int limit = 50)
     {
         var (start, end) = TimeWindow.GetRange(window);
         var startStr = start.ToString("o");
@@ -108,7 +109,7 @@ public sealed class StatisticsService
         QueryDimension dimension,
         QueryDirection direction,
         QueryWindow window,
-        int limit = 25)
+        int limit = 50)
     {
         var (start, end) = TimeWindow.GetRange(window);
         var startStr = start.ToString("o");
@@ -241,6 +242,104 @@ public sealed class StatisticsService
         return resultIds;
     }
 
+    /// <summary>
+    /// ItemIds for SCHEDULED playlists (v0.0.0.7).
+    ///
+    /// - Dimension = Songs:  ranked songs (most/least played in the window).
+    /// - Dimension = Genres: ranked songs of ONE genre (genreFilter). If genreFilter is
+    ///   empty it falls back to all songs.
+    /// - Artists/Albums are no longer offered for scheduled lists.
+    ///
+    /// The `ascending` flag controls the ORDER INSIDE the playlist:
+    ///   ascending  = from the least played to the most played,
+    ///   descending = from the most played to the least played.
+    ///
+    /// Ties (same period plays) always resolve as: less historic plays first,
+    /// then chronological (first_seen ASC: the oldest registered tracks first).
+    /// </summary>
+    public List<string> GetScheduledItemIds(
+        QueryDimension dimension,
+        QueryWindow window,
+        int limit,
+        bool ascending,
+        string? genreFilter)
+    {
+        var (start, end) = TimeWindow.GetRange(window);
+        var startStr = start.ToString("o");
+        var endStr = end.ToString("o");
+        var dir = ascending ? "ASC" : "DESC";
+
+        using var conn = _db.OpenMain();
+        using var cmd = conn.CreateCommand();
+        cmd.Parameters.AddWithValue("@start", startStr);
+        cmd.Parameters.AddWithValue("@end", endStr);
+        cmd.Parameters.AddWithValue("@limit", limit);
+
+        var hasGenre = dimension == QueryDimension.Genres && !string.IsNullOrWhiteSpace(genreFilter);
+
+        if (hasGenre)
+        {
+            cmd.CommandText = $"""
+                SELECT t.item_id
+                FROM tracks t
+                JOIN track_genres tg ON tg.item_id = t.item_id
+                LEFT JOIN plays p ON p.item_id = t.item_id AND p.played_at >= @start AND p.played_at < @end
+                WHERE tg.genre = @genre
+                GROUP BY t.item_id, t.name, t.first_seen
+                ORDER BY COUNT(p.id) {dir},
+                         (SELECT COUNT(*) FROM plays p2 WHERE p2.item_id = t.item_id) ASC,
+                         t.first_seen ASC,
+                         t.name ASC
+                LIMIT @limit;
+                """;
+            cmd.Parameters.AddWithValue("@genre", genreFilter!.Trim());
+        }
+        else
+        {
+            cmd.CommandText = $"""
+                SELECT t.item_id
+                FROM tracks t
+                LEFT JOIN plays p ON p.item_id = t.item_id AND p.played_at >= @start AND p.played_at < @end
+                GROUP BY t.item_id, t.name, t.first_seen
+                ORDER BY COUNT(p.id) {dir},
+                         (SELECT COUNT(*) FROM plays p2 WHERE p2.item_id = t.item_id) ASC,
+                         t.first_seen ASC,
+                         t.name ASC
+                LIMIT @limit;
+                """;
+        }
+
+        var ids = new List<string>();
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (!reader.IsDBNull(0)) ids.Add(reader.GetString(0));
+        }
+
+        _logger.LogDebug(
+            "Scheduled query: dim={Dim} window={Window} limit={Limit} asc={Asc} genre={Genre} -> {Count} ids",
+            dimension, window, limit, ascending, genreFilter, ids.Count);
+        return ids;
+    }
+
+    /// <summary>
+    /// Distinct list of every genre known to the plugin DB (used by the
+    /// scheduled-playlists form to let the user pick one genre).
+    /// </summary>
+    public List<string> GetAllGenres()
+    {
+        var genres = new List<string>();
+        using var conn = _db.OpenMain();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT DISTINCT genre FROM track_genres ORDER BY genre COLLATE NOCASE;";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (!reader.IsDBNull(0)) genres.Add(reader.GetString(0));
+        }
+        return genres;
+    }
+
     // ---- SQL templates ----
 
     private static string TopSongsSql(string dir) => $@"
@@ -265,7 +364,7 @@ public sealed class StatisticsService
         FROM tracks t
         LEFT JOIN plays p ON p.item_id = t.item_id AND p.played_at >= @start AND p.played_at < @end
         GROUP BY t.item_id, t.name, t.album_artist, t.album_name
-        ORDER BY period_plays {dir}, total_plays ASC, t.name ASC
+        ORDER BY period_plays {dir}, total_plays ASC, t.first_seen ASC, t.name ASC
         LIMIT @limit;";
 
     private static string TopArtistsSql(string dir) => $@"
@@ -288,9 +387,10 @@ public sealed class StatisticsService
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 JOIN track_artists ta2 ON ta2.item_id = p2.item_id WHERE ta2.artist = ta.artist) AS total_plays
         FROM track_artists ta
+        JOIN tracks t ON t.item_id = ta.item_id
         LEFT JOIN plays p ON p.item_id = ta.item_id AND p.played_at >= @start AND p.played_at < @end
         GROUP BY ta.artist
-        ORDER BY period_plays {dir}, total_plays ASC, ta.artist ASC
+        ORDER BY period_plays {dir}, total_plays ASC, MIN(t.first_seen) ASC, ta.artist ASC
         LIMIT @limit;";
 
     private static string TopAlbumsSql(string dir) => $@"
@@ -317,7 +417,7 @@ public sealed class StatisticsService
         LEFT JOIN plays p ON p.item_id = t.item_id AND p.played_at >= @start AND p.played_at < @end
         WHERE t.album_name IS NOT NULL
         GROUP BY t.album_name, t.album_artist
-        ORDER BY period_plays {dir}, total_plays ASC, t.album_name ASC
+        ORDER BY period_plays {dir}, total_plays ASC, MIN(t.first_seen) ASC, t.album_name ASC
         LIMIT @limit;";
 
     private static string TopGenresSql(string dir) => $@"
@@ -340,8 +440,9 @@ public sealed class StatisticsService
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 JOIN track_genres tg2 ON tg2.item_id = p2.item_id WHERE tg2.genre = tg.genre) AS total_plays
         FROM track_genres tg
+        JOIN tracks t ON t.item_id = tg.item_id
         LEFT JOIN plays p ON p.item_id = tg.item_id AND p.played_at >= @start AND p.played_at < @end
         GROUP BY tg.genre
-        ORDER BY period_plays {dir}, total_plays ASC, tg.genre ASC
+        ORDER BY period_plays {dir}, total_plays ASC, MIN(t.first_seen) ASC, tg.genre ASC
         LIMIT @limit;";
 }
