@@ -24,6 +24,13 @@ public sealed class TrackInfo
     /// <summary>Song duration in milliseconds.</summary>
     public long? DurationMs { get; set; }
 
+    /// <summary>
+    /// Year of the song (from Jellyfin's ProductionYear field). Captured so that
+    /// future versions can filter by year (e.g. "most listened of 1982"). Nullable
+    /// because not all songs have a year in their metadata.
+    /// </summary>
+    public int? Year { get; set; }
+
     /// <summary>File path on disk (for debugging / deduplication if needed).</summary>
     public string? FilePath { get; set; }
 

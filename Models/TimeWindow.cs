@@ -92,11 +92,11 @@ public static class TimeWindow
     /// <summary>Human-readable label in Spanish for a window.</summary>
     public static string Label(QueryWindow w) => w switch
     {
-        QueryWindow.TwoWeeks => "Ultimas 2 semanas",
-        QueryWindow.OneMonth => "Ultimo mes",
-        QueryWindow.ThreeMonths => "Ultimos 3 meses",
-        QueryWindow.SixMonths => "Ultimos 6 meses",
-        QueryWindow.TwelveMonths => "Ultimos 12 meses",
+        QueryWindow.TwoWeeks => "Últimas 2 semanas",
+        QueryWindow.OneMonth => "Último mes",
+        QueryWindow.ThreeMonths => "Últimos 3 meses",
+        QueryWindow.SixMonths => "Últimos 6 meses",
+        QueryWindow.TwelveMonths => "Últimos 12 meses",
         QueryWindow.LastYear => "Año anterior",
         _ => w.ToString()
     };

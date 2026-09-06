@@ -26,9 +26,14 @@ internal static class Schema
                 album_name TEXT,
                 duration_ms INTEGER,
                 file_path TEXT,
+                year INTEGER,
                 first_seen TEXT NOT NULL,
                 last_updated TEXT NOT NULL
             );");
+
+        // Migration: add 'year' column to tracks if it doesn't exist (for upgrades from v0.0.0.4 or earlier).
+        // SQLite doesn't have "IF NOT EXISTS" for ADD COLUMN, so we check the schema first.
+        AddColumnIfMissing(tx, "tracks", "year", "INTEGER");
 
         // Artists are multi-valued per track (e.g. "Artist A feat. Artist B").
         // Each artist is counted separately in Top/Bottom artist queries.
@@ -151,5 +156,37 @@ internal static class Schema
         cmd.Transaction = tx;
         cmd.CommandText = sql;
         cmd.ExecuteNonQuery();
+    }
+
+    /// <summary>
+    /// Adds a column to a table if it doesn't already exist. Used for schema migrations
+    /// when upgrading from older plugin versions. SQLite doesn't support
+    /// "ALTER TABLE ... ADD COLUMN IF NOT EXISTS", so we check pragma table_info first.
+    /// </summary>
+    private static void AddColumnIfMissing(SqliteTransaction tx, string table, string column, string type)
+    {
+        // Check if column already exists
+        using (var checkCmd = tx.Connection!.CreateCommand())
+        {
+            checkCmd.Transaction = tx;
+            checkCmd.CommandText = $"PRAGMA table_info({table});";
+            using var reader = checkCmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var name = reader.GetString(reader.GetOrdinal("name"));
+                if (string.Equals(name, column, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return; // Column already exists, nothing to do
+                }
+            }
+        }
+
+        // Column doesn't exist — add it
+        using (var alterCmd = tx.Connection!.CreateCommand())
+        {
+            alterCmd.Transaction = tx;
+            alterCmd.CommandText = $"ALTER TABLE {table} ADD COLUMN {column} {type};";
+            alterCmd.ExecuteNonQuery();
+        }
     }
 }

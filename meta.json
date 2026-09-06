@@ -5,9 +5,9 @@
   "overview": "Estadisticas de musica independientes: Top 25 y Bottom 25 por cancion/artista/album/genero en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. Purga automatica a los 14 meses con archivo historico anual.",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "0.0.0.4",
-  "changelog": "- FIXED: Error 404 al hacer consultas. La URL se construia manualmente con serverAddress + path, lo que fallaba en servidores con reverse proxy. Ahora se usa ApiClient.getUrl() (el mismo patron que el plugin de podcasts).\n- FIXED: Texto 'Ano' cambiado a 'Año' en todas las etiquetas de ventanas temporales y selects.\n- NEW: Logo del plugin actualizado.",
+  "version": "0.0.0.5",
+  "changelog": "- NEW: Captura del año de la canción (campo ProductionYear de Jellyfin) en la tabla tracks. Reservado para uso futuro (filtrar por año, ej: 'lo más escuchado de 1982').\n- FIXED: Ortografía corregida al español de Guatemala: Álbumes, Géneros, Últimas/Últimos, Reproducción, Día, Miércoles, Sábado, Más, Aún, Todavía, Cómo, sólo, etc.\n- NEW: Formato de fechas en dd-MMM-aaaa (ej: 05-Sep-2026) en toda la UI.\n- NEW: Formato de horas en HH:MM (24h) en la pestaña de listas programadas.\n- Se mantienen en inglés las palabras técnicas: Top 25, Bottom 25, Debug, playlist, tracks, plays.",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-09-06T02:45:00Z",
+  "timestamp": "2026-09-06T03:15:00Z",
   "imagePath": "logo.png"
 }
