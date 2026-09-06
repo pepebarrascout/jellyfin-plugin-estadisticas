@@ -140,7 +140,7 @@
                             <option value="3m">Ultimos 3 meses</option>
                             <option value="6m">Ultimos 6 meses</option>
                             <option value="12m" selected>Ultimos 12 meses</option>
-                            <option value="last_year">Ano anterior</option>
+                            <option value="last_year">Año anterior</option>
                         </select>
                     </div>
                     <div style="flex: 0; align-self: flex-end;">
@@ -179,7 +179,7 @@
                             <option value="3m">Ultimos 3 meses</option>
                             <option value="6m">Ultimos 6 meses</option>
                             <option value="12m" selected>Ultimos 12 meses</option>
-                            <option value="last_year">Ano anterior</option>
+                            <option value="last_year">Año anterior</option>
                         </select>
                     </div>
                     <div style="flex: 0; align-self: flex-end;">
@@ -237,7 +237,7 @@
                                 <option value="3m">Ultimos 3 meses</option>
                                 <option value="6m">Ultimos 6 meses</option>
                                 <option value="12m" selected>Ultimos 12 meses</option>
-                                <option value="last_year">Ano anterior</option>
+                                <option value="last_year">Año anterior</option>
                             </select>
                         </div>
                         <div class="inputContainer">
@@ -327,22 +327,30 @@
 
         // --- Helpers ---
         function getToken() {
-            // Read the X-Emby-Token from the URL or the dashboard's API helper
+            // Use Jellyfin's ApiClient to get the access token (the same way the
+            // podcast plugin does). Fall back to cookie/query parsing if needed.
             try {
-                if (window.ApiClient && window.ApiClient.getCurrentUserId) {
-                    if (window.ApiClient.accessToken) {
-                        const t = window.ApiClient.accessToken();
-                        if (t) return t;
-                    }
-                    if (window.ApiClient.serverInfo && window.ApiClient.serverInfo.AccessToken) {
-                        return window.ApiClient.serverInfo.AccessToken;
-                    }
+                if (window.ApiClient && window.ApiClient.accessToken) {
+                    const t = window.ApiClient.accessToken();
+                    if (t) return t;
+                }
+                if (window.ApiClient && window.ApiClient.serverInfo && window.ApiClient.serverInfo.AccessToken) {
+                    return window.ApiClient.serverInfo.AccessToken;
                 }
             } catch (e) {}
             const m = /AccessToken=([a-f0-9]+)/.exec(document.cookie + ';' + location.search);
             return m ? m[1] : '';
         }
         function apiUrl(path) {
+            // CRITICAL: use ApiClient.getUrl() instead of constructing the URL manually.
+            // ApiClient.getUrl() handles the correct base path (including any reverse-
+            // proxy prefix). Manual construction with serverAddress + path causes 404s
+            // because it skips the Jellyfin URL helpers. This is the pattern used by
+            // the podcast plugin (which works).
+            if (window.ApiClient && window.ApiClient.getUrl) {
+                return window.ApiClient.getUrl('Plugins/Estadisticas' + path);
+            }
+            // Fallback (should rarely be needed)
             const base = (window.ApiClient && window.ApiClient.serverAddress) ? window.ApiClient.serverAddress : '';
             return base + '/Plugins/Estadisticas' + path;
         }
@@ -682,7 +690,7 @@
                 '</tbody></table>';
             html += '<h3 style="margin-top:1.5em;">Reproducciones por ventana temporal</h3>';
             html += '<table class="statsTable"><thead><tr><th>Ventana</th><th>Reproducciones en ese periodo</th></tr></thead><tbody>';
-            const labels = { '2w': 'Ultimas 2 semanas', '1m': 'Ultimo mes', '3m': 'Ultimos 3 meses', '6m': 'Ultimos 6 meses', '12m': 'Ultimos 12 meses', 'last_year': 'Ano anterior' };
+            const labels = { '2w': 'Ultimas 2 semanas', '1m': 'Ultimo mes', '3m': 'Ultimos 3 meses', '6m': 'Ultimos 6 meses', '12m': 'Ultimos 12 meses', 'last_year': 'Año anterior' };
             Object.keys(labels).forEach(k => {
                 const count = wp[k];
                 const color = count > 0 ? '#a0e0a0' : '#e0a0a0';

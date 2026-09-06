@@ -97,7 +97,7 @@ public static class TimeWindow
         QueryWindow.ThreeMonths => "Ultimos 3 meses",
         QueryWindow.SixMonths => "Ultimos 6 meses",
         QueryWindow.TwelveMonths => "Ultimos 12 meses",
-        QueryWindow.LastYear => "Ano anterior",
+        QueryWindow.LastYear => "Año anterior",
         _ => w.ToString()
     };
 

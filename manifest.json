@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-estadisticas/main/logo.png",
     "versions": [
       {
+        "version": "0.0.0.4",
+        "changelog": "- FIXED: Error 404 al hacer consultas. La URL se construia manualmente con serverAddress + path, lo que fallaba en servidores con reverse proxy. Ahora se usa ApiClient.getUrl() (el mismo patron que el plugin de podcasts).\n- FIXED: Texto 'Ano' cambiado a 'Año' en todas las etiquetas de ventanas temporales y selects.\n- NEW: Logo del plugin actualizado.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-estadisticas/releases/download/v0.0.0.4/jellyfin-plugin-estadisticas_0.0.0.4.zip",
+        "checksum": "5497427C17C2B554C984202D36A48CE3",
+        "timestamp": "2026-09-06T02:45:00Z"
+      },
+      {
         "version": "0.0.0.3",
         "changelog": "- FIXED: La UI se quedaba colgada con 'Consultando...' para siempre cuando el servidor devolvia un error no-JSON. Ahora el frontend maneja timeouts (30s), errores HTTP, y respuestas no-JSON con mensajes claros.\n- NEW: Pestana 'Debug' con 3 botones: actualizar estado, inyectar datos de prueba (50 canciones sinteticas + ~1500 reproducciones distribuidas en las 6 ventanas temporales), y borrar todos los datos.\n- NEW: Endpoints /Debug/Status, /Debug/SeedTestData, /Debug/ClearAll para testing sin esperar 2 semanas.\n- NEW: Mensaje 'Sin resultados' mas util cuando una consulta devuelve 0 filas, explicando posibles causas y sugiriendo usar la pestana Debug.\n- NEW: SqliteDb.IsInitialized flag; los endpoints verifican el estado de la BD antes de consultar y devuelven error claro si la BD no se inicializo.\n- Mensaje de error mejorado en CreatePlaylist cuando no hay resultados.",
         "targetAbi": "10.11.0.0",
