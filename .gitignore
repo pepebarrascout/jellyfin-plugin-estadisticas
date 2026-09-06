@@ -1,6 +1,7 @@
 # .NET build artifacts
 bin/
 obj/
+publish/
 *.user
 *.suo
 
@@ -13,6 +14,16 @@ obj/
 artifacts/
 [Bb]uild/
 *.zip
+jellyfin-plugin-estadisticas_*.zip
+
+# Build DLLs (compiled output, not source)
+Jellyfin.Plugin.Estadisticas.dll
+Jellyfin.Plugin.Estadisticas.pdb
+Jellyfin.Plugin.Estadisticas.xml
+Jellyfin.Plugin.Estadisticas.deps.json
+
+# Temp/checksum files
+.checksum.txt
 
 # OS files
 .DS_Store
