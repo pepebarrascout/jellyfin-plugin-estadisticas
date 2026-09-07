@@ -29,6 +29,10 @@ Jellyfin.Plugin.Estadisticas.deps.json
 .DS_Store
 Thumbs.db
 
+# Python cache
+__pycache__/
+*.pyc
+
 # Local dev config
 *.local.json
 dev/

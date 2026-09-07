@@ -355,11 +355,13 @@ def read_jellyfin_data(conn, user_id=None):
         if "value" in iv_col_map and "item_id" in iv_col_map:
             type_col = iv_col_map.get("type")
             if type_col:
-                # Read genres (Type = 1 or Type = 'Genre')
+                # Jellyfin 10.11 ItemValueType mapping (from ItemValueType.cs):
+                #   Artist = 0, AlbumArtist = 1, Genre = 2
+                # Read genres (Type = 2)
                 genre_query = f"""
                     SELECT "{iv_col_map["value"]}", "{iv_col_map["item_id"]}"
                     FROM {item_values_table}
-                    WHERE "{type_col}" = 1 OR "{type_col}" = 'Genre' OR "{type_col}" = 'genre';
+                    WHERE "{type_col}" = 2 OR "{type_col}" = 'Genre' OR "{type_col}" = 'genre';
                 """
                 try:
                     cursor = conn.execute(genre_query)
@@ -374,11 +376,11 @@ def read_jellyfin_data(conn, user_id=None):
                 except Exception as e:
                     log(f"No se pudieron leer géneros con filtro de tipo: {e}", "WARN")
 
-                # Read artists (Type = 2 or Type = 'Artist')
+                # Read artists (Type = 0 = Artist, Type = 1 = AlbumArtist)
                 artist_query = f"""
-                    SELECT "{iv_col_map["value"]}", "{iv_col_map["item_id"]}"
+                    SELECT "{iv_col_map["value"]}", "{iv_col_map["item_id"]}", "{type_col}"
                     FROM {item_values_table}
-                    WHERE "{type_col}" = 2 OR "{type_col}" = 'Artist' OR "{type_col}" = 'artist';
+                    WHERE "{type_col}" IN (0, 1) OR "{type_col}" IN ('Artist', 'artist', 'AlbumArtist', 'album_artist');
                 """
                 try:
                     cursor = conn.execute(artist_query)

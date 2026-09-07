@@ -270,6 +270,7 @@
                     </div>
                     <button is="emby-button" type="button" class="raised button-submit" id="histRefresh">Consultar año</button>
                     <button is="emby-button" type="button" class="raised" id="histCompare">Ver comparativa de años</button>
+                    <button is="emby-button" type="button" class="raised" id="histRegenerate" style="background: #c0392b; color: #fff;">Regenerar histórico</button>
                 </div>
 
                 <div id="histResults"></div>
@@ -978,6 +979,17 @@
         }
         document.getElementById('histRefresh').addEventListener('click', () => {
             loadHistoricalYear(document.getElementById('histYear').value);
+        });
+        document.getElementById('histRegenerate').addEventListener('click', async () => {
+            if (!confirm('¿Regenerar el histórico anual? Esto puede tardar varios segundos. Se leen todas las reproducciones de la BD principal y se generan los agregados anuales.')) return;
+            showStatus('Regenerando histórico... (puede tardar)', 'info');
+            const r = await apiPost('/Historical/Regenerate');
+            if (r && r.success) {
+                showStatus('Histórico regenerado: ' + (r.message || 'OK'), 'ok');
+                loadHistoricalYears();
+            } else {
+                showStatus('Error: ' + (r && r.error ? r.error : 'desconocido'), 'err');
+            }
         });
         document.getElementById('histCompare').addEventListener('click', async () => {
             document.getElementById('histResults').innerHTML = '<div class="fieldDescription">Cargando comparativa...</div>';

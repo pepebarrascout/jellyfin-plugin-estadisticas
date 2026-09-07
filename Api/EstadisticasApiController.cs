@@ -321,6 +321,28 @@ public sealed class EstadisticasApiController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Forces the generation of yearly historical aggregates from the main DB.
+    /// Useful after importing data, so the "Histórico" tab has data without
+    /// waiting for the monthly purge task to run.
+    /// </summary>
+    [HttpPost("Historical/Regenerate")]
+    public ActionResult RegenerateHistorical()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            _historical.RunMonthlyMaintenance();
+            var years = _historical.GetAvailableYears();
+            return Ok(new { success = true, yearsGenerated = years, message = $"Histórico regenerado. Años disponibles: {string.Join(", ", years)}" });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "RegenerateHistorical error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
     /// <summary>List all scheduled playlists.</summary>
     [HttpGet("ScheduledPlaylists")]
     public ActionResult ListScheduled()
