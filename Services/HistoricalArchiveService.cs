@@ -204,4 +204,203 @@ public sealed class HistoricalArchiveService
 
         PurgeOldPlays();
     }
+
+    // ====== Query methods for the "Histórico" tab (v0.0.0.9) ======
+
+    /// <summary>
+    /// Returns the list of years available in the historical DB.
+    /// </summary>
+    public List<int> GetAvailableYears()
+    {
+        var years = new List<int>();
+        using var conn = _db.OpenHistorical();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = "SELECT DISTINCT year FROM yearly_songs ORDER BY year DESC;";
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            if (!reader.IsDBNull(0)) years.Add(reader.GetInt32(0));
+        }
+        return years;
+    }
+
+    /// <summary>
+    /// Returns a summary for a specific year: top songs, top artists, top genres,
+    /// top albums, and total play count.
+    /// </summary>
+    public Dictionary<string, object> GetYearSummary(int year)
+    {
+        var result = new Dictionary<string, object>();
+        using var conn = _db.OpenHistorical();
+
+        // Top 25 songs
+        var topSongs = new List<Dictionary<string, object>>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT item_id, name, album_artist, album_name, play_count, total_duration_ms FROM yearly_songs WHERE year = @y ORDER BY play_count DESC, name ASC LIMIT 25;";
+            cmd.Parameters.AddWithValue("@y", year);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                topSongs.Add(new Dictionary<string, object>
+                {
+                    ["itemId"] = r.IsDBNull(0) ? "" : r.GetString(0),
+                    ["name"] = r.IsDBNull(1) ? "" : r.GetString(1),
+                    ["albumArtist"] = r.IsDBNull(2) ? null : r.GetString(2),
+                    ["albumName"] = r.IsDBNull(3) ? null : r.GetString(3),
+                    ["playCount"] = r.GetInt64(4),
+                    ["durationMs"] = r.GetInt64(5)
+                });
+            }
+        }
+        result["topSongs"] = topSongs;
+
+        // Top 25 artists
+        var topArtists = new List<Dictionary<string, object>>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT artist, play_count FROM yearly_artists WHERE year = @y ORDER BY play_count DESC, artist ASC LIMIT 25;";
+            cmd.Parameters.AddWithValue("@y", year);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                topArtists.Add(new Dictionary<string, object>
+                {
+                    ["name"] = r.GetString(0),
+                    ["playCount"] = r.GetInt64(1)
+                });
+            }
+        }
+        result["topArtists"] = topArtists;
+
+        // Top 25 genres
+        var topGenres = new List<Dictionary<string, object>>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT genre, play_count FROM yearly_genres WHERE year = @y ORDER BY play_count DESC, genre ASC LIMIT 25;";
+            cmd.Parameters.AddWithValue("@y", year);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                topGenres.Add(new Dictionary<string, object>
+                {
+                    ["name"] = r.GetString(0),
+                    ["playCount"] = r.GetInt64(1)
+                });
+            }
+        }
+        result["topGenres"] = topGenres;
+
+        // Top 25 albums
+        var topAlbums = new List<Dictionary<string, object>>();
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT album_artist, album_name, play_count FROM yearly_albums WHERE year = @y ORDER BY play_count DESC, album_name ASC LIMIT 25;";
+            cmd.Parameters.AddWithValue("@y", year);
+            using var r = cmd.ExecuteReader();
+            while (r.Read())
+            {
+                topAlbums.Add(new Dictionary<string, object>
+                {
+                    ["albumArtist"] = r.IsDBNull(0) ? null : r.GetString(0),
+                    ["albumName"] = r.GetString(1),
+                    ["playCount"] = r.GetInt64(2)
+                });
+            }
+        }
+        result["topAlbums"] = topAlbums;
+
+        // Total plays for the year
+        using (var cmd = conn.CreateCommand())
+        {
+            cmd.CommandText = "SELECT COALESCE(SUM(play_count), 0), COALESCE(SUM(total_duration_ms), 0) FROM yearly_songs WHERE year = @y;";
+            cmd.Parameters.AddWithValue("@y", year);
+            using var r = cmd.ExecuteReader();
+            if (r.Read())
+            {
+                result["totalPlays"] = r.GetInt64(0);
+                result["totalDurationMs"] = r.GetInt64(1);
+            }
+        }
+
+        return result;
+    }
+
+    /// <summary>
+    /// Returns a side-by-side comparison of all available years.
+    /// For each year: total plays, top genre, top artist, top song, total duration.
+    /// </summary>
+    public List<Dictionary<string, object>> GetYearComparison()
+    {
+        var result = new List<Dictionary<string, object>>();
+        var years = GetAvailableYears();
+
+        foreach (var year in years)
+        {
+            var row = new Dictionary<string, object> { ["year"] = year };
+            using var conn = _db.OpenHistorical();
+
+            // Total plays
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COALESCE(SUM(play_count), 0) FROM yearly_songs WHERE year = @y;";
+                cmd.Parameters.AddWithValue("@y", year);
+                row["totalPlays"] = (long)cmd.ExecuteScalar();
+            }
+
+            // Top genre
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT genre, play_count FROM yearly_genres WHERE year = @y ORDER BY play_count DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@y", year);
+                using var r = cmd.ExecuteReader();
+                if (r.Read())
+                {
+                    row["topGenre"] = r.GetString(0);
+                    row["topGenrePlays"] = r.GetInt64(1);
+                }
+                else { row["topGenre"] = null; row["topGenrePlays"] = 0L; }
+            }
+
+            // Top artist
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT artist, play_count FROM yearly_artists WHERE year = @y ORDER BY play_count DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@y", year);
+                using var r = cmd.ExecuteReader();
+                if (r.Read())
+                {
+                    row["topArtist"] = r.GetString(0);
+                    row["topArtistPlays"] = r.GetInt64(1);
+                }
+                else { row["topArtist"] = null; row["topArtistPlays"] = 0L; }
+            }
+
+            // Top song
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT name, play_count FROM yearly_songs WHERE year = @y ORDER BY play_count DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@y", year);
+                using var r = cmd.ExecuteReader();
+                if (r.Read())
+                {
+                    row["topSong"] = r.GetString(0);
+                    row["topSongPlays"] = r.GetInt64(1);
+                }
+                else { row["topSong"] = null; row["topSongPlays"] = 0L; }
+            }
+
+            // Total duration
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COALESCE(SUM(total_duration_ms), 0) FROM yearly_songs WHERE year = @y;";
+                cmd.Parameters.AddWithValue("@y", year);
+                row["totalDurationMs"] = (long)cmd.ExecuteScalar();
+            }
+
+            result.Add(row);
+        }
+
+        return result;
+    }
 }

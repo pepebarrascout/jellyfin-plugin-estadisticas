@@ -92,6 +92,9 @@ public sealed class EstadisticasPluginServiceRegistrator : IPluginServiceRegistr
         // to inspect DB state and seed synthetic test data.
         serviceCollection.AddTransient<DebugService>();
 
+        // Achievement service (transient) — calculates achievements and levels.
+        serviceCollection.AddTransient<AchievementService>();
+
         // Playback tracker: hosted service that subscribes to playback events.
         serviceCollection.AddHostedService<PlaybackTrackerService>();
 

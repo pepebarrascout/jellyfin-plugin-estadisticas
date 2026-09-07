@@ -16,6 +16,8 @@
                 <a class="emby-button" href="#" data-role="button" data-tab="bottom">Bottom 50 (menos escuchadas)</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="sched">Listas programadas</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="resumen">Resumen</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="historico">Histórico</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="logros">Logros</a>
             </div>
 
             <!-- ====== TOP 50 TAB ====== -->
@@ -252,6 +254,41 @@
                 </div>
             </div>
 
+            <!-- ====== HISTÓRICO TAB ====== -->
+            <div id="tab-historico" class="page-content hide">
+                <h2>Histórico anual</h2>
+                <div class="fieldDescription" style="margin-bottom: 1em;">
+                    Visualización de los datos históricos anuales (agregados por año calendario). Los datos se generan automáticamente cuando se ejecuta la tarea de purga mensual (1º de cada mes).
+                </div>
+
+                <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
+                    <div class="selectContainer" style="flex: 0.3; min-width: 10em;">
+                        <label class="selectLabel" for="histYear">Año</label>
+                        <select is="emby-select" id="histYear" class="emby-select-withcolor emby-select">
+                            <option value="">(Selecciona un año)</option>
+                        </select>
+                    </div>
+                    <button is="emby-button" type="button" class="raised button-submit" id="histRefresh">Consultar año</button>
+                    <button is="emby-button" type="button" class="raised" id="histCompare">Ver comparativa de años</button>
+                </div>
+
+                <div id="histResults"></div>
+            </div>
+
+            <!-- ====== LOGROS TAB ====== -->
+            <div id="tab-logros" class="page-content hide">
+                <h2>Logros y niveles</h2>
+                <div class="fieldDescription" style="margin-bottom: 1em;">
+                    Insignias y niveles ganados según tu historial de escucha. Los niveles se calculan por mes, semestre y año calendario (hora local del servidor).
+                </div>
+
+                <div style="margin: 1em 0;">
+                    <button is="emby-button" type="button" class="raised button-submit" id="achievementsRefresh">Actualizar logros</button>
+                </div>
+
+                <div id="achievementsResults"></div>
+            </div>
+
         </div>
     </div>
 
@@ -468,6 +505,8 @@
             document.getElementById('tab-' + tabName).classList.remove('hide');
             if (tabName === 'sched') loadScheduled();
             if (tabName === 'resumen') loadDebugStatus();
+            if (tabName === 'historico') loadHistoricalYears();
+            if (tabName === 'logros') loadAchievements();
         }
         page.querySelectorAll('[data-tab]').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -866,6 +905,178 @@
                 doClear();
             }
         });
+
+        // --- HISTÓRICO TAB (v0.0.0.9) ---
+        async function loadHistoricalYears() {
+            const sel = document.getElementById('histYear');
+            if (!sel) return;
+            const r = await apiGet('/Historical/Years');
+            if (r && r.success && Array.isArray(r.years) && r.years.length > 0) {
+                sel.innerHTML = '';
+                r.years.forEach(y => {
+                    const o = document.createElement('option');
+                    o.value = y; o.textContent = y;
+                    sel.appendChild(o);
+                });
+                // Auto-load the most recent year
+                loadHistoricalYear(r.years[0]);
+            } else {
+                sel.innerHTML = '<option value="">(Sin datos históricos)</option>';
+                document.getElementById('histResults').innerHTML = '<div class="fieldDescription">No hay datos históricos todavía. Los agregados anuales se generan automáticamente cuando se ejecuta la tarea de purga mensual (1º de cada mes). Puedes forzar la generación ejecutando la tarea "Purgar reproducciones antiguas" desde el panel de Tareas Programadas de Jellyfin.</div>';
+            }
+        }
+        async function loadHistoricalYear(year) {
+            if (!year) { document.getElementById('histResults').innerHTML = ''; return; }
+            document.getElementById('histResults').innerHTML = '<div class="fieldDescription">Consultando año ' + escapeHtml(String(year)) + '...</div>';
+            const r = await apiGet('/Historical/Year/' + encodeURIComponent(year));
+            if (!r || !r.success) {
+                document.getElementById('histResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">Error: ' + (r && r.error ? r.error : 'desconocido') + '</div>';
+                return;
+            }
+            const d = r.data;
+            let html = '<h3 style="margin-top: 0.5em;">Resumen del año ' + escapeHtml(String(year)) + '</h3>';
+            html += '<table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;"><tbody>';
+            html += '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; width: 20em; background: #1a1a1a;">Reproducciones totales</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (d.totalPlays || 0) + '</td></tr>';
+            html += '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Tiempo total escuchado (aprox.)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + formatDuration(d.totalDurationMs || 0) + '</td></tr>';
+            html += '</tbody></table>';
+
+            // Top 25 songs
+            html += '<h3 style="margin-top: 1.5em;">Top 25 canciones</h3>';
+            html += renderHistoricalTable(d.topSongs, ['name', 'albumArtist', 'albumName', 'playCount'], ['Canción', 'Artista', 'Álbum', 'Reproducciones']);
+
+            // Top 25 artists
+            html += '<h3 style="margin-top: 1.5em;">Top 25 artistas</h3>';
+            html += renderHistoricalTable(d.topArtists, ['name', 'playCount'], ['Artista', 'Reproducciones']);
+
+            // Top 25 genres
+            html += '<h3 style="margin-top: 1.5em;">Top 25 géneros</h3>';
+            html += renderHistoricalTable(d.topGenres, ['name', 'playCount'], ['Género', 'Reproducciones']);
+
+            // Top 25 albums
+            html += '<h3 style="margin-top: 1.5em;">Top 25 álbumes</h3>';
+            html += renderHistoricalTable(d.topAlbums, ['albumName', 'albumArtist', 'playCount'], ['Álbum', 'Artista', 'Reproducciones']);
+
+            document.getElementById('histResults').innerHTML = html;
+        }
+        function renderHistoricalTable(rows, fields, headers) {
+            if (!rows || rows.length === 0) return '<div class="fieldDescription">Sin datos.</div>';
+            let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;"><thead><tr>';
+            headers.forEach(h => { html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">' + h + '</th>'; });
+            html += '</tr></thead><tbody>';
+            rows.forEach((r, i) => {
+                html += '<tr>';
+                fields.forEach((f, idx) => {
+                    const val = r[f];
+                    const isPlays = f === 'playCount';
+                    const style = isPlays ? 'color: #00a4dc; font-weight: 600; text-align: right;' : '';
+                    html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; ' + style + '">' + escapeHtml(val != null ? String(val) : '—') + '</td>';
+                });
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            return html;
+        }
+        document.getElementById('histRefresh').addEventListener('click', () => {
+            loadHistoricalYear(document.getElementById('histYear').value);
+        });
+        document.getElementById('histCompare').addEventListener('click', async () => {
+            document.getElementById('histResults').innerHTML = '<div class="fieldDescription">Cargando comparativa...</div>';
+            const r = await apiGet('/Historical/Compare');
+            if (!r || !r.success) {
+                document.getElementById('histResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">Error: ' + (r && r.error ? r.error : 'desconocido') + '</div>';
+                return;
+            }
+            const rows = r.data || [];
+            if (rows.length === 0) {
+                document.getElementById('histResults').innerHTML = '<div class="fieldDescription">No hay años para comparar.</div>';
+                return;
+            }
+            let html = '<h3 style="margin-top: 0.5em;">Comparativa de años</h3>';
+            html += '<table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;"><thead><tr>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Año</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">Reproducciones</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top género</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top artista</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top canción</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">Tiempo total</th>';
+            html += '</tr></thead><tbody>';
+            rows.forEach(r => {
+                html += '<tr>';
+                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; font-weight: 600;">' + r.year + '</td>';
+                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + (r.totalPlays || 0) + '</td>';
+                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.topGenre || '—') + '</td>';
+                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.topArtist || '—') + '</td>';
+                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.topSong || '—') + '</td>';
+                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + formatDuration(r.totalDurationMs || 0) + '</td>';
+                html += '</tr>';
+            });
+            html += '</tbody></table>';
+            document.getElementById('histResults').innerHTML = html;
+        });
+
+        // --- LOGROS TAB (v0.0.0.9) ---
+        async function loadAchievements() {
+            const el = document.getElementById('achievementsResults');
+            if (!el) return;
+            el.innerHTML = '<div class="fieldDescription">Cargando logros...</div>';
+            const r = await apiGet('/Achievements');
+            if (!r || !r.success) {
+                el.innerHTML = '<div class="fieldDescription" style="color:#c0392b;">Error: ' + (r && r.error ? r.error : 'desconocido') + '</div>';
+                return;
+            }
+            const achievements = r.achievements || [];
+            if (achievements.length === 0) {
+                el.innerHTML = '<div class="fieldDescription">No hay logros disponibles.</div>';
+                return;
+            }
+
+            // Group by category
+            const categories = {};
+            achievements.forEach(a => {
+                if (!categories[a.Category]) categories[a.Category] = [];
+                categories[a.Category].push(a);
+            });
+
+            // Summary header
+            let html = '<div class="paperList" style="padding: 1em 1.5em; margin-bottom: 1.5em; text-align: center;">';
+            html += '<div style="font-size: 2em; font-weight: 700; color: #00a4dc;">' + r.earnedCount + ' / ' + r.totalCount + '</div>';
+            html += '<div class="fieldDescription">logros desbloqueados</div>';
+            html += '</div>';
+
+            // Render each category
+            Object.keys(categories).forEach(cat => {
+                html += '<h3 style="margin-top: 1.5em;">' + escapeHtml(cat) + '</h3>';
+                html += '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1em; margin-top: 0.5em;">';
+                categories[cat].forEach(a => {
+                    const opacity = a.Earned ? '1' : '0.4';
+                    const borderColor = a.Earned ? '#00a4dc' : '#2a2a2a';
+                    const bgColor = a.Earned ? '#0d2137' : '#1a1a1a';
+                    const iconColor = a.Earned ? '#00a4dc' : '#555';
+                    const progress = Math.round(a.Progress);
+                    const unit = a.Unit || '';
+                    html += '<div class="paperList" style="padding: 1em; border: 1px solid ' + borderColor + '; background: ' + bgColor + '; opacity: ' + opacity + ';">';
+                    html += '<div style="display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.5em;">';
+                    html += '<span class="material-icons" style="font-size: 1.5em; color: ' + iconColor + ';">' + escapeHtml(a.Icon) + '</span>';
+                    html += '<strong style="flex: 1;">' + escapeHtml(a.Name) + '</strong>';
+                    if (a.Earned) html += '<span class="material-icons" style="color: #00a4dc;">check_circle</span>';
+                    html += '</div>';
+                    html += '<div class="fieldDescription" style="margin-bottom: 0.5em;">' + escapeHtml(a.Description) + '</div>';
+                    // Progress bar
+                    html += '<div style="background: #2a2a2a; border-radius: 4px; height: 8px; overflow: hidden; margin-top: 0.5em;">';
+                    html += '<div style="background: ' + (a.Earned ? '#00a4dc' : '#555') + '; height: 100%; width: ' + progress + '%;"></div>';
+                    html += '</div>';
+                    html += '<div style="display: flex; justify-content: space-between; margin-top: 0.3em; font-size: 0.85em; color: #888;">';
+                    html += '<span>' + (a.Current || 0) + unit + ' / ' + a.Target + unit + '</span>';
+                    html += '<span>' + progress + '%</span>';
+                    html += '</div>';
+                    html += '</div>';
+                });
+                html += '</div>';
+            });
+
+            el.innerHTML = html;
+        }
+        document.getElementById('achievementsRefresh').addEventListener('click', loadAchievements);
 
         // Initial load: pre-fill top results
         runTop();

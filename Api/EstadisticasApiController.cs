@@ -6,6 +6,7 @@ using Jellyfin.Plugin.Estadisticas.Data;
 using Jellyfin.Plugin.Estadisticas.Models;
 using Jellyfin.Plugin.Estadisticas.Services;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.Estadisticas.Api;
@@ -26,6 +27,8 @@ public sealed class EstadisticasApiController : ControllerBase
     private readonly PlaylistSchedulerService _scheduler;
     private readonly PlaylistPublisherService _publisher;
     private readonly DebugService _debug;
+    private readonly AchievementService _achievements;
+    private readonly HistoricalArchiveService _historical;
 
     public EstadisticasApiController(
         ILogger<EstadisticasApiController> logger,
@@ -33,7 +36,9 @@ public sealed class EstadisticasApiController : ControllerBase
         StatisticsService stats,
         PlaylistSchedulerService scheduler,
         PlaylistPublisherService publisher,
-        DebugService debug)
+        DebugService debug,
+        AchievementService achievements,
+        HistoricalArchiveService historical)
     {
         _logger = logger;
         _db = db;
@@ -41,6 +46,8 @@ public sealed class EstadisticasApiController : ControllerBase
         _scheduler = scheduler;
         _publisher = publisher;
         _debug = debug;
+        _achievements = achievements;
+        _historical = historical;
     }
 
     /// <summary>
@@ -233,6 +240,87 @@ public sealed class EstadisticasApiController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Returns all achievements with their current progress and earned status (v0.0.0.9).
+    /// Displayed in the "Logros" tab.
+    /// </summary>
+    [HttpGet("Achievements")]
+    public ActionResult GetAchievements()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var achievements = _achievements.GetAllAchievements();
+            var earned = achievements.Count(a => a.Earned);
+            var total = achievements.Count;
+            return Ok(new { success = true, achievements, earnedCount = earned, totalCount = total });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetAchievements error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Returns the list of years available in the historical DB (v0.0.0.9).
+    /// </summary>
+    [HttpGet("Historical/Years")]
+    public ActionResult GetHistoricalYears()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var years = _historical.GetAvailableYears();
+            return Ok(new { success = true, years });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetHistoricalYears error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Returns the historical aggregates for a specific year (v0.0.0.9).
+    /// Includes top songs, artists, genres, and albums for that year.
+    /// </summary>
+    [HttpGet("Historical/Year/{year}")]
+    public ActionResult GetHistoricalYear(int year)
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _historical.GetYearSummary(year);
+            return Ok(new { success = true, year, data });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetHistoricalYear error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Returns a comparison of all available years side by side (v0.0.0.9).
+    /// Useful for the "Histórico" tab to show year-over-year evolution.
+    /// </summary>
+    [HttpGet("Historical/Compare")]
+    public ActionResult GetHistoricalComparison()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _historical.GetYearComparison();
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetHistoricalComparison error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
     /// <summary>List all scheduled playlists.</summary>
     [HttpGet("ScheduledPlaylists")]
     public ActionResult ListScheduled()
@@ -368,6 +456,143 @@ public sealed class EstadisticasApiController : ControllerBase
         }
         catch { return false; }
     }
+
+    // ====== PUBLIC API (v0.0.0.9) ======
+    // These endpoints are designed for external consumption (web pages, scripts, etc.).
+    // They return read-only data in formats suitable for publishing.
+    // NOTE: Jellyfin still enforces authentication on /Plugins/* routes by default.
+    // For truly public access, configure a reverse proxy to bypass auth for these
+    // specific paths, or use the /Public/Stats endpoint which returns a compact JSON.
+
+    /// <summary>
+    /// Returns a compact JSON snapshot of the user's listening stats, suitable for
+    /// publishing on a web page. Includes: total plays, top 10 songs/artists/genres
+    /// per window, and listening time by genre.
+    /// </summary>
+    [HttpGet("Public/Stats")]
+    public ActionResult PublicStats()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var result = new Dictionary<string, object>();
+            result["generatedAt"] = DateTime.UtcNow.ToString("o");
+            result["serverTimeLocal"] = ServerClock.NowLocal().ToString("o");
+
+            // Global counts
+            using (var conn = _db.OpenMain())
+            {
+                result["totalPlays"] = Count(conn, "plays");
+                result["totalTracks"] = Count(conn, "tracks");
+                result["totalArtists"] = Count(conn, "track_artists", "DISTINCT artist");
+                result["totalGenres"] = Count(conn, "track_genres", "DISTINCT genre");
+            }
+
+            // Top 10 per window per dimension
+            var windows = new[] { QueryWindow.TwoWeeks, QueryWindow.OneMonth, QueryWindow.ThreeMonths, QueryWindow.SixMonths, QueryWindow.TwelveMonths, QueryWindow.LastYear };
+            var topData = new Dictionary<string, object>();
+            foreach (var w in windows)
+            {
+                var wCode = TimeWindow.Code(w);
+                var wData = new Dictionary<string, object>();
+                wData["label"] = TimeWindow.Label(w);
+                wData["topSongs"] = _stats.Query(QueryDimension.Songs, QueryDirection.Top, w, 10);
+                wData["topArtists"] = _stats.Query(QueryDimension.Artists, QueryDirection.Top, w, 10);
+                wData["topGenres"] = _stats.Query(QueryDimension.Genres, QueryDirection.Top, w, 10);
+                topData[wCode] = wData;
+            }
+            result["topByWindow"] = topData;
+
+            // Listening time by genre per window
+            result["listeningTimeByGenre"] = _stats.GetListeningTimeByGenrePerWindow();
+
+            // Achievements summary
+            var achievements = _achievements.GetAllAchievements();
+            result["achievements"] = new
+            {
+                earned = achievements.Count(a => a.Earned),
+                total = achievements.Count,
+                earnedList = achievements.Where(a => a.Earned).Select(a => new { a.Id, a.Name, a.Category }).ToList()
+            };
+
+            return Ok(result);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PublicStats error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Returns an RSS 2.0 feed of the user's most recent "musical milestones":
+    /// top songs per month for the last 12 months. Suitable for publishing
+    /// in an RSS reader or embedding in a web page.
+    /// </summary>
+    [HttpGet("Public/Rss")]
+    [Produces("application/rss+xml")]
+    public ActionResult PublicRss()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var now = DateTime.UtcNow.ToString("R");
+            var sb = new System.Text.StringBuilder();
+            sb.Append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+            sb.Append("<rss version=\"2.0\">");
+            sb.Append("<channel>");
+            sb.Append("<title>Estadísticas de Música - Jellyfin</title>");
+            sb.Append("<description>Top de canciones más escuchadas por ventana temporal</description>");
+            sb.Append("<link>").Append(Url.Action("PublicRss")?.Replace("/Public/Rss", "") ?? "").Append("</link>");
+            sb.Append("<lastBuildDate>").Append(now).Append("</lastBuildDate>");
+            sb.Append("<pubDate>").Append(now).Append("</pubDate>");
+
+            var windows = new[] { QueryWindow.TwoWeeks, QueryWindow.OneMonth, QueryWindow.ThreeMonths, QueryWindow.SixMonths, QueryWindow.TwelveMonths, QueryWindow.LastYear };
+            foreach (var w in windows)
+            {
+                var rows = _stats.Query(QueryDimension.Songs, QueryDirection.Top, w, 10);
+                if (rows.Count == 0) continue;
+
+                var label = TimeWindow.Label(w);
+                var (start, end) = TimeWindow.GetRange(w);
+                sb.Append("<item>");
+                sb.Append("<title>Top 10 canciones — ").Append(EscapeXml(label)).Append("</title>");
+                sb.Append("<description>Periodo: ").Append(EscapeXml(start.ToString("yyyy-MM-dd"))).Append(" a ").Append(EscapeXml(end.ToString("yyyy-MM-dd"))).Append("</description>");
+                sb.Append("<pubDate>").Append(end.ToString("R")).Append("</pubDate>");
+                sb.Append("<guid isPermaLink=\"false\">estadisticas-").Append(TimeWindow.Code(w)).Append("-").Append(end.ToString("yyyyMMdd")).Append("</guid>");
+
+                var htmlList = new System.Text.StringBuilder();
+                htmlList.Append("<![CDATA[<ol>");
+                foreach (var r in rows)
+                {
+                    htmlList.Append("<li>").Append(EscapeHtml(r.Name));
+                    if (!string.IsNullOrEmpty(r.Subtitle)) htmlList.Append(" — ").Append(EscapeHtml(r.Subtitle));
+                    htmlList.Append(" (").Append(r.PlayCount).Append(" reproducciones)</li>");
+                }
+                htmlList.Append("</ol>]]></description>");
+                sb.Append(htmlList);
+                sb.Append("</item>");
+            }
+
+            sb.Append("</channel></rss>");
+            return Content(sb.ToString(), "application/rss+xml", System.Text.Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PublicRss error");
+            return Content($"<rss><channel><title>Error</title><description>{EscapeXml(ex.Message)}</description></channel></rss>", "application/rss+xml");
+        }
+    }
+
+    private static long Count(SqliteConnection conn, string table, string expr = "*")
+    {
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = $"SELECT COUNT({expr}) FROM {table};";
+        return (long)cmd.ExecuteScalar();
+    }
+
+    private static string EscapeXml(string s) => s?.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace("\"", "&quot;").Replace("'", "&apos;") ?? "";
+    private static string EscapeHtml(string s) => s?.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;") ?? "";
 
     /// <summary>DTO for create/update scheduled playlist.</summary>
     public sealed class ScheduledPlaylistDto

@@ -5,9 +5,9 @@
   "overview": "Estadisticas de musica independientes: Top 50 y Bottom 50 por cancion/artista/album/genero en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. Purga automatica a los 14 meses con archivo historico anual.",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "0.0.0.8",
-  "changelog": "- NEW: Filtro por año de la canción en Top/Bottom manuales y en listas programadas. Permite consultas como 'lo más escuchado de 1982' o 'lo menos escuchado de 1995'.\n- NEW: Tabla 'Tiempo total escuchado' en la pestaña Resumen. Muestra por género el tiempo total aproximado (suma de duraciones) en cada ventana temporal, con columna de total. Formato: 38h 20m 15s.\n- NEW: Endpoints /Years (lista de años disponibles) y /ListeningTime (tiempo total por género x ventana).\n- FIXED: Botón 'Consultar' ahora ocupa su propia fila (clase 'block') para alinearse correctamente con el botón 'Crear playlist' de abajo.\n- UI: Selectors de Dimensión y Ventana temporal ligeramente más pequeños (min-width 10em) para dar espacio al nuevo selector de Año.\n- Schema migration: columna 'year_filter' añadida a scheduled_playlists.",
+  "version": "0.0.0.9",
+  "changelog": "- NEW: API pública con endpoints /Public/Stats (JSON) y /Public/Rss (RSS 2.0) para publicar estadísticas en webs externas. Documentación completa en docs/API.md.\n- NEW: Pestaña 'Histórico' con visualización de agregados anuales: top 25 canciones/artistas/géneros/álbumes por año + comparativa lado a lado de todos los años.\n- NEW: Pestaña 'Logros' con 30+ logros y niveles por mes/semestre/año. Insignias con iconos, barras de progreso, y categorías (Volumen, Diversidad, Tiempo, Niveles).\n- NEW: Endpoints /Achievements, /Historical/Years, /Historical/Year/{year}, /Historical/Compare.\n- NEW: AchievementService con cálculo de logros basado en el historial de escucha.\n- NEW: HistoricalArchiveService con métodos de consulta (GetAvailableYears, GetYearSummary, GetYearComparison).",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-09-07T10:00:00Z",
+  "timestamp": "2026-09-07T11:00:00Z",
   "imagePath": "logo.png"
 }
