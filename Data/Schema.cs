@@ -95,6 +95,7 @@ internal static class Schema
                 query_direction TEXT NOT NULL,
                 query_window TEXT NOT NULL,
                 genre TEXT,
+                year_filter INTEGER,
                 playlist_limit INTEGER NOT NULL DEFAULT 50,
                 frequency TEXT NOT NULL,
                 time_of_day TEXT NOT NULL,
@@ -113,6 +114,10 @@ internal static class Schema
         // Migration: add 'genre' column to scheduled_playlists (v0.0.0.7) so the user
         // can pick ONE genre (e.g. "Rock") when the dimension is Genres.
         AddColumnIfMissing(tx, "scheduled_playlists", "genre", "TEXT");
+
+        // Migration: add 'year_filter' column to scheduled_playlists (v0.0.0.8) so the
+        // user can filter by song release year (e.g. "Top 50 of songs released in 1982").
+        AddColumnIfMissing(tx, "scheduled_playlists", "year_filter", "INTEGER");
 
         tx.Commit();
     }

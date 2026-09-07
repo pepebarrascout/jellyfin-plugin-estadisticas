@@ -64,7 +64,8 @@ public sealed class EstadisticasApiController : ControllerBase
         [FromQuery] string dimension,
         [FromQuery] string direction,
         [FromQuery] string window,
-        [FromQuery] int limit = 50)
+        [FromQuery] int limit = 50,
+        [FromQuery] int? year = null)
     {
         if (!EnsureDbReady(out var err)) return err;
         try
@@ -72,7 +73,7 @@ public sealed class EstadisticasApiController : ControllerBase
             var dim = Enum.Parse<QueryDimension>(dimension, true);
             var dir = Enum.Parse<QueryDirection>(direction, true);
             var win = TimeWindow.ParseCode(window);
-            var rows = _stats.Query(dim, dir, win, limit);
+            var rows = _stats.Query(dim, dir, win, limit, year);
             // INCLUSIVE display boundaries (server-local dates) shown in the UI,
             // e.g. "01-Ago-2026 a 31-Ago-2026" (the internal SQL range stays half-open).
             var (displayStart, displayEnd) = TimeWindow.GetDisplayRange(win);
@@ -85,6 +86,7 @@ public sealed class EstadisticasApiController : ControllerBase
                 windowLabel = TimeWindow.Label(win),
                 rangeStart = displayStart.ToString("yyyy-MM-dd"),
                 rangeEnd = displayEnd.ToString("yyyy-MM-dd"),
+                yearFilter = year,
                 rows,
                 rowCount = rows.Count
             });
@@ -103,7 +105,8 @@ public sealed class EstadisticasApiController : ControllerBase
         [FromQuery] string dimension,
         [FromQuery] string direction,
         [FromQuery] string window,
-        [FromQuery] int limit = 50)
+        [FromQuery] int limit = 50,
+        [FromQuery] int? year = null)
     {
         if (!EnsureDbReady(out var err)) return err;
         try
@@ -115,7 +118,7 @@ public sealed class EstadisticasApiController : ControllerBase
             var dir = Enum.Parse<QueryDirection>(direction, true);
             var win = TimeWindow.ParseCode(window);
 
-            var itemIds = _stats.GetItemIdsForPlaylist(dim, dir, win, limit);
+            var itemIds = _stats.GetItemIdsForPlaylist(dim, dir, win, limit, year);
             if (itemIds.Count == 0)
                 return Ok(new { success = false, error = "La consulta no produjo resultados. Prueba con otra ventana temporal o dimension." });
 
@@ -185,6 +188,47 @@ public sealed class EstadisticasApiController : ControllerBase
         catch (Exception ex)
         {
             _logger.LogError(ex, "GetGenres error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Distinct release years known to the plugin DB (v0.0.0.8). Used by the
+    /// UI to populate the year selector. Ordered descending (newest first).
+    /// </summary>
+    [HttpGet("Years")]
+    public ActionResult GetYears()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var years = _stats.GetAllYears();
+            return Ok(new { success = true, years });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetYears error");
+            return Ok(new { success = false, error = ex.Message });
+        }
+    }
+
+    /// <summary>
+    /// Total listening time (ms) by genre and time window (v0.0.0.8).
+    /// Used by the "Resumen" tab to show the "Tiempo total escuchado" table.
+    /// Approximation: sums the FULL duration of each track played in the window.
+    /// </summary>
+    [HttpGet("ListeningTime")]
+    public ActionResult GetListeningTime()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _stats.GetListeningTimeByGenrePerWindow();
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "GetListeningTime error");
             return Ok(new { success = false, error = ex.Message });
         }
     }
@@ -288,6 +332,7 @@ public sealed class EstadisticasApiController : ControllerBase
         sp.QueryDirection = string.IsNullOrWhiteSpace(dto.QueryDirection) ? nameof(QueryDirection.Top) : dto.QueryDirection;
         sp.QueryWindow = string.IsNullOrWhiteSpace(dto.QueryWindow) ? "12m" : dto.QueryWindow;
         sp.Genre = string.IsNullOrWhiteSpace(dto.Genre) ? null : dto.Genre.Trim();
+        sp.Year = dto.Year > 0 ? dto.Year : null;
         sp.Limit = dto.Limit > 0 ? dto.Limit : 50;
         sp.Frequency = string.IsNullOrWhiteSpace(dto.Frequency) ? nameof(ScheduleFrequency.Daily) : dto.Frequency;
         sp.TimeOfDay = string.IsNullOrWhiteSpace(dto.TimeOfDay) ? "08:00" : dto.TimeOfDay;
@@ -333,6 +378,7 @@ public sealed class EstadisticasApiController : ControllerBase
         public string? QueryDirection { get; set; }
         public string? QueryWindow { get; set; }
         public string? Genre { get; set; }
+        public int? Year { get; set; }
         public int Limit { get; set; }
         public string? Frequency { get; set; }
         public string? TimeOfDay { get; set; }

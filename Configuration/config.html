@@ -26,7 +26,7 @@
                 </div>
 
                 <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
-                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                    <div class="selectContainer" style="flex: 1; min-width: 10em;">
                         <label class="selectLabel" for="topDimension">Dimensión</label>
                         <select is="emby-select" id="topDimension" class="emby-select-withcolor emby-select">
                             <option value="Songs">Canciones</option>
@@ -35,7 +35,7 @@
                             <option value="Genres">Géneros</option>
                         </select>
                     </div>
-                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                    <div class="selectContainer" style="flex: 1; min-width: 10em;">
                         <label class="selectLabel" for="topWindow">Ventana temporal</label>
                         <select is="emby-select" id="topWindow" class="emby-select-withcolor emby-select">
                             <option value="2w">Últimas 2 semanas</option>
@@ -46,7 +46,16 @@
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
-                    <button is="emby-button" type="button" class="raised button-submit" id="topRefresh">Consultar</button>
+                    <div class="selectContainer" style="flex: 0.5; min-width: 8em;">
+                        <label class="selectLabel" for="topYear">Año</label>
+                        <select is="emby-select" id="topYear" class="emby-select-withcolor emby-select">
+                            <option value="">(Todos)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1em;">
+                    <button is="emby-button" type="button" class="raised button-submit block" id="topRefresh">Consultar</button>
                 </div>
 
                 <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.5em;">
@@ -68,7 +77,7 @@
                 </div>
 
                 <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
-                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                    <div class="selectContainer" style="flex: 1; min-width: 10em;">
                         <label class="selectLabel" for="botDimension">Dimensión</label>
                         <select is="emby-select" id="botDimension" class="emby-select-withcolor emby-select">
                             <option value="Songs">Canciones</option>
@@ -77,7 +86,7 @@
                             <option value="Genres">Géneros</option>
                         </select>
                     </div>
-                    <div class="selectContainer" style="flex: 1; min-width: 12em;">
+                    <div class="selectContainer" style="flex: 1; min-width: 10em;">
                         <label class="selectLabel" for="botWindow">Ventana temporal</label>
                         <select is="emby-select" id="botWindow" class="emby-select-withcolor emby-select">
                             <option value="2w">Últimas 2 semanas</option>
@@ -88,7 +97,16 @@
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
-                    <button is="emby-button" type="button" class="raised button-submit" id="botRefresh">Consultar</button>
+                    <div class="selectContainer" style="flex: 0.5; min-width: 8em;">
+                        <label class="selectLabel" for="botYear">Año</label>
+                        <select is="emby-select" id="botYear" class="emby-select-withcolor emby-select">
+                            <option value="">(Todos)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 1em;">
+                    <button is="emby-button" type="button" class="raised button-submit block" id="botRefresh">Consultar</button>
                 </div>
 
                 <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 0.5em;">
@@ -144,6 +162,13 @@
                                 <option value="">(Todos)</option>
                             </select>
                             <div class="fieldDescription">Se generará con las canciones de ese género. Ej: Rock.</div>
+                        </div>
+                        <div class="selectContainer">
+                            <label class="selectLabel" for="sfYear">Año</label>
+                            <select is="emby-select" id="sfYear" class="emby-select-withcolor emby-select">
+                                <option value="">(Todos)</option>
+                            </select>
+                            <div class="fieldDescription">Filtrar por año de la canción. Ej: 1982.</div>
                         </div>
                         <div class="selectContainer">
                             <label class="selectLabel" for="sfWindow">Ventana temporal</label>
@@ -453,20 +478,23 @@
         // Show top tab by default
         showTab('top');
 
-        // --- TOP 25 ---
+        // --- TOP 50 ---
         async function runTop() {
             const dim = document.getElementById('topDimension').value;
             const win = document.getElementById('topWindow').value;
+            const yearVal = document.getElementById('topYear').value;
+            const yearParam = yearVal ? '&year=' + encodeURIComponent(yearVal) : '';
             document.getElementById('topResults').innerHTML = '<div class="fieldDescription">Consultando...</div>';
             clearStatus();
-            const r = await apiGet('/Query?dimension=' + dim + '&direction=Top&window=' + win + '&limit=50');
+            const r = await apiGet('/Query?dimension=' + dim + '&direction=Top&window=' + win + '&limit=50' + yearParam);
             if (!r || !r.success) {
                 showStatus('Error al consultar: ' + (r && r.error ? r.error : 'desconocido'), 'err');
                 document.getElementById('topResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</div>';
                 return;
             }
+            const yearLabel = yearVal ? ' — Año: ' + escapeHtml(yearVal) : '';
             const hdr = '<div class="fieldDescription" style="margin-bottom: 0.5em;">Periodo: ' + escapeHtml(r.windowLabel) +
-                ' (' + formatDate(r.rangeStart) + ' a ' + formatDate(r.rangeEnd) + ') — ' +
+                ' (' + formatDate(r.rangeStart) + ' a ' + formatDate(r.rangeEnd) + ')' + yearLabel + ' — ' +
                 r.rowCount + ' resultado(s)</div>';
             document.getElementById('topResults').innerHTML = hdr + renderTable(r.rows, r.dimension);
         }
@@ -476,26 +504,31 @@
             if (!name) { showStatus('Escribe un nombre para la playlist.', 'err'); return; }
             const dim = document.getElementById('topDimension').value;
             const win = document.getElementById('topWindow').value;
+            const yearVal = document.getElementById('topYear').value;
+            const yearParam = yearVal ? '&year=' + encodeURIComponent(yearVal) : '';
             showStatus('Creando playlist...', 'info');
-            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Top&window=' + win + '&limit=50');
+            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Top&window=' + win + '&limit=50' + yearParam);
             if (r && r.success) showStatus('Playlist creada con ' + r.itemCount + ' canciones.', 'ok');
             else showStatus('Error al crear playlist: ' + (r && r.error ? r.error : 'desconocido'), 'err');
         });
 
-        // --- BOTTOM 25 ---
+        // --- BOTTOM 50 ---
         async function runBot() {
             const dim = document.getElementById('botDimension').value;
             const win = document.getElementById('botWindow').value;
+            const yearVal = document.getElementById('botYear').value;
+            const yearParam = yearVal ? '&year=' + encodeURIComponent(yearVal) : '';
             document.getElementById('botResults').innerHTML = '<div class="fieldDescription">Consultando...</div>';
             clearStatus();
-            const r = await apiGet('/Query?dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=50');
+            const r = await apiGet('/Query?dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=50' + yearParam);
             if (!r || !r.success) {
                 showStatus('Error al consultar: ' + (r && r.error ? r.error : 'desconocido'), 'err');
                 document.getElementById('botResults').innerHTML = '<div class="fieldDescription" style="color:#c0392b;">No se pudo completar la consulta. Revisa el mensaje de error arriba.</div>';
                 return;
             }
+            const yearLabel = yearVal ? ' — Año: ' + escapeHtml(yearVal) : '';
             const hdr = '<div class="fieldDescription" style="margin-bottom: 0.5em;">Periodo: ' + escapeHtml(r.windowLabel) +
-                ' (' + formatDate(r.rangeStart) + ' a ' + formatDate(r.rangeEnd) + ') — ' +
+                ' (' + formatDate(r.rangeStart) + ' a ' + formatDate(r.rangeEnd) + ')' + yearLabel + ' — ' +
                 r.rowCount + ' resultado(s)</div>';
             document.getElementById('botResults').innerHTML = hdr + renderTable(r.rows, r.dimension);
         }
@@ -505,8 +538,10 @@
             if (!name) { showStatus('Escribe un nombre para la playlist.', 'err'); return; }
             const dim = document.getElementById('botDimension').value;
             const win = document.getElementById('botWindow').value;
+            const yearVal = document.getElementById('botYear').value;
+            const yearParam = yearVal ? '&year=' + encodeURIComponent(yearVal) : '';
             showStatus('Creando playlist...', 'info');
-            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=50');
+            const r = await apiPost('/CreatePlaylist?name=' + encodeURIComponent(name) + '&dimension=' + dim + '&direction=Bottom&window=' + win + '&limit=50' + yearParam);
             if (r && r.success) showStatus('Playlist creada con ' + r.itemCount + ' canciones.', 'ok');
             else showStatus('Error al crear playlist: ' + (r && r.error ? r.error : 'desconocido'), 'err');
         });
@@ -558,6 +593,37 @@
             if (sel.value !== wanted) sel.value = ''; // el género ya no existe en la BD
         }
 
+        // --- Year selector (v0.0.0.8) ---
+        let yearsCache = null;
+        async function loadYears(force) {
+            if (yearsCache && !force) return yearsCache;
+            const r = await apiGet('/Years');
+            if (r && r.success && Array.isArray(r.years)) yearsCache = r.years;
+            else if (!yearsCache) yearsCache = [];
+            return yearsCache;
+        }
+        async function populateYearSelect(selectEl, selected, force) {
+            if (!selectEl) return;
+            const years = await loadYears(force);
+            selectEl.innerHTML = '';
+            const optAll = document.createElement('option');
+            optAll.value = '';
+            optAll.textContent = '(Todos)';
+            selectEl.appendChild(optAll);
+            years.forEach(y => {
+                const o = document.createElement('option');
+                o.value = y;
+                o.textContent = y;
+                selectEl.appendChild(o);
+            });
+            const wanted = selected != null ? String(selected) : '';
+            selectEl.value = wanted;
+        }
+        // Populate year selects on load
+        populateYearSelect(document.getElementById('topYear'), null);
+        populateYearSelect(document.getElementById('botYear'), null);
+        populateYearSelect(document.getElementById('sfYear'), null);
+
         async function loadScheduled() {
             const r = await apiGet('/ScheduledPlaylists');
             const el = document.getElementById('schedList');
@@ -575,6 +641,7 @@
                 const dimLabel = DIM_LABELS_ES[it.QueryDimension] || it.QueryDimension;
                 const meta = orden + ' — ' + it.Limit + ' ' + dimLabel +
                     (it.QueryDimension === 'Genres' && it.Genre ? ' (' + it.Genre + ')' : '') +
+                    (it.Year ? ' [Año ' + it.Year + ']' : '') +
                     ' / ' + it.QueryWindow + ' / ' + (FREQ_LABELS[it.Frequency] || it.Frequency) + ' @ ' + it.TimeOfDay +
                     (it.Enabled ? '' : ' (DESHABILITADA)');
                 const lastRunStr = it.LastRun ? formatDateTime(it.LastRun) : '(nunca)';
@@ -600,6 +667,7 @@
             const dimVal = (item && (item.QueryDimension === 'Genres' || item.QueryDimension === 'Songs')) ? item.QueryDimension : 'Songs';
             document.getElementById('sfDimension').value = dimVal;
             populateGenreSelect(item ? item.Genre : null, !item);
+            populateYearSelect(document.getElementById('sfYear'), item ? item.Year : null, !item);
             document.getElementById('sfWindow').value = item ? item.QueryWindow : '12m';
             document.getElementById('sfLimit').value = item ? item.Limit : 50;
             document.getElementById('sfFrequency').value = item ? item.Frequency : 'Daily';
@@ -648,6 +716,7 @@
                 QueryDimension: sfDim,
                 QueryWindow: document.getElementById('sfWindow').value,
                 Genre: sfDim === 'Genres' ? (document.getElementById('sfGenre').value || null) : null,
+                Year: document.getElementById('sfYear').value ? parseInt(document.getElementById('sfYear').value, 10) : null,
                 Limit: parseInt(document.getElementById('sfLimit').value, 10) || 50,
                 Frequency: document.getElementById('sfFrequency').value,
                 TimeOfDay: document.getElementById('sfTime').value,
@@ -713,7 +782,69 @@
                 html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + labels[k] + ' (' + k + ')</td><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; color: ' + color + ';">' + (count >= 0 ? count : '?') + '</td></tr>';
             });
             html += '</tbody></table>';
+
+            // --- Tiempo total escuchado (v0.0.0.8) ---
+            // Tabla: Género | 2 sem | 1 mes | 3 meses | 6 meses | 12 meses | Año anterior | Total
+            // Aproximación: suma la duración COMPLETA de cada canción reproducida en el periodo.
+            try {
+                const lt = await apiGet('/ListeningTime');
+                if (lt && lt.success && lt.data) {
+                    const data = lt.data;
+                    const winCols = ['2w', '1m', '3m', '6m', '12m', 'last_year'];
+                    const winLabels = { '2w': '2 semanas', '1m': '1 mes', '3m': '3 meses', '6m': '6 meses', '12m': '12 meses', 'last_year': 'Año anterior' };
+
+                    html += '<h3 style="margin-top: 1.5em;">Tiempo total escuchado (aproximado)</h3>';
+                    html += '<div class="fieldDescription" style="margin-bottom: 0.5em;">Suma la duración completa de cada canción reproducida en el periodo (no el tiempo real escuchado). Ordenado por total descendente.</div>';
+
+                    // Sort genres by total (sum of all windows) descending
+                    const genres = Object.keys(data);
+                    const genreTotals = {};
+                    genres.forEach(g => {
+                        let total = 0;
+                        winCols.forEach(w => { total += (data[g][w] || 0); });
+                        genreTotals[g] = total;
+                    });
+                    genres.sort((a, b) => (genreTotals[b] || 0) - (genreTotals[a] || 0));
+
+                    if (genres.length === 0) {
+                        html += '<div class="fieldDescription">Aún no hay datos suficientes para mostrar el tiempo total escuchado.</div>';
+                    } else {
+                        html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;">';
+                        html += '<thead><tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Género</th>';
+                        winCols.forEach(w => {
+                            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">' + winLabels[w] + '</th>';
+                        });
+                        html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">Total</th>';
+                        html += '</tr></thead><tbody>';
+                        genres.forEach(g => {
+                            html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; font-weight: 600;">' + escapeHtml(g) + '</td>';
+                            winCols.forEach(w => {
+                                const ms = (data[g] && data[g][w]) || 0;
+                                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-family: monospace;">' + (ms > 0 ? formatDuration(ms) : '—') + '</td>';
+                            });
+                            html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-weight: 600; color: #00a4dc; font-family: monospace;">' + formatDuration(genreTotals[g] || 0) + '</td>';
+                            html += '</tr>';
+                        });
+                        html += '</tbody></table></div>';
+                    }
+                }
+            } catch (e) {
+                html += '<div class="fieldDescription" style="color:#c0392b; margin-top: 1em;">Error al cargar tiempo total: ' + escapeHtml(String(e)) + '</div>';
+            }
+
             el.innerHTML = html;
+        }
+
+        // Helper: format milliseconds as "Xh Ym Zs" (e.g. "38h 20m 15s")
+        function formatDuration(ms) {
+            if (!ms || ms <= 0) return '0s';
+            const totalSec = Math.floor(ms / 1000);
+            const h = Math.floor(totalSec / 3600);
+            const m = Math.floor((totalSec % 3600) / 60);
+            const s = totalSec % 60;
+            if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
+            if (m > 0) return m + 'm ' + s + 's';
+            return s + 's';
         }
         document.getElementById('debugRefresh').addEventListener('click', loadDebugStatus);
         document.getElementById('debugClear').addEventListener('click', () => {

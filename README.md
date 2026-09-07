@@ -142,7 +142,7 @@ El plugin registra dos tareas en **Panel de Control > Tareas Programadas > Estad
 
 | Default | Tarea | Descripción |
 |---|---|---|
-| 🕒 **Cada 15 min** | Publicar listas programadas | Revisa las listas vencidas y las republica (reemplazando contenido) |
+| 🕒 **Cada 1 min** | Publicar listas programadas | Revisa las listas vencidas y las republica (reemplazando contenido). Las playlists sólo se publican en el momento exacto de su programación, no en cada tick. |
 | 🕒 **Diario a las 03:00** | Purgar reproducciones antiguas | Elimina plays >14 meses y actualiza el archivo histórico. Solo ejecuta el día 1 del mes. |
 
 Ambas tareas se pueden reconfigurar desde el dashboard de Jellyfin.
@@ -195,7 +195,7 @@ Ambas tareas se pueden reconfigurar desde el dashboard de Jellyfin.
 ### Las playlists programadas no se publican
 - Verifica que la tarea **"Publicar listas de reproducción programadas"** esté habilitada
 - Revisa la columna `next_run` en la pestaña **Listas programadas** del plugin
-- La tarea se ejecuta cada 15 minutos; si la próxima ejecución está en el futuro, espera
+- La tarea se ejecuta cada 1 minuto; las playlists se publican con granularidad de ~60 segundos respecto a la hora programada
 
 ### La purga de reproducciones antiguas no se ejecuta
 - Solo se ejecuta el **día 1 de cada mes a las 03:00** (hora local del servidor)
@@ -248,7 +248,7 @@ El archivo `.dll` resultante se copia a la carpeta de plugins de Jellyfin junto 
 | `Services/PlaylistSchedulerService.cs` | CRUD + cómputo de next_run para listas programadas |
 | `Services/HistoricalArchiveService.cs` | Purga mensual (>14 meses) + agregados anuales |
 | `Tasks/PurgeOldPlaysTask.cs` | IScheduledTask: purga mensual |
-| `Tasks/PublishScheduledPlaylistsTask.cs` | IScheduledTask: publicación cada 15 min |
+| `Tasks/PublishScheduledPlaylistsTask.cs` | IScheduledTask: publicación cada 1 min |
 | `Api/EstadisticasApiController.cs` | API REST para consultas y gestión de listas |
 | `Configuration/PluginConfiguration.cs` | Modelo de configuración (persistencia XML automática) |
 | `Configuration/config.html` | Página de configuración del dashboard (3 pestañas) |

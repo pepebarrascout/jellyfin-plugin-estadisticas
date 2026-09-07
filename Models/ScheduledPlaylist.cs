@@ -51,6 +51,13 @@ public sealed class ScheduledPlaylist
     /// </summary>
     public string? Genre { get; set; }
 
+    /// <summary>
+    /// Optional year filter (v0.0.0.8). When set, only songs whose release year
+    /// matches this value are included in the playlist. Null = all years.
+    /// Example: 1982 to generate "Top 50 of songs released in 1982".
+    /// </summary>
+    public int? Year { get; set; }
+
     /// <summary>Maximum number of items in the playlist (default 50).</summary>
     public int Limit { get; set; } = 50;
 
