@@ -301,23 +301,48 @@ def read_jellyfin_data(conn, user_id=None):
                 user_filter = f'WHERE "{ud_col_map["user_id"]}" = ?'
                 params = (user_id,)
 
-            agg_cols = [
-                f'"{ud_col_map["item_id"]}" AS item_id',
-                f'SUM(CAST("{ud_col_map["play_count"]}" AS INTEGER)) AS total_plays',
-            ]
-            if "last_played" in ud_col_map:
-                agg_cols.append(f'MAX("{ud_col_map["last_played"]}") AS last_played')
-            else:
-                agg_cols.append("NULL AS last_played")
+            # IMPORTANT: Jellyfin's UserData table can have MULTIPLE rows per
+            # (ItemId, UserId) — one with CustomDataKey = lower(ItemId) and
+            # others with CustomDataKey = song name, etc. Each has its own
+            # PlayCount. If we SUM(PlayCount) GROUP BY ItemId, we double-count.
+            #
+            # Fix: only count the row where CustomDataKey matches the ItemId
+            # (case-insensitive). This is the "canonical" play count row.
+            # If CustomDataKey column doesn't exist, fall back to MAX(PlayCount)
+            # per item (take the highest, not the sum).
 
-            ud_query = f"""
-                SELECT {', '.join(agg_cols)}
-                FROM {user_data_table}
-                {user_filter}
-                GROUP BY "{ud_col_map["item_id"]}"
-                HAVING total_plays > 0;
-            """
-            log(f"Leyendo play counts...")
+            cdk_col = None
+            for c in ["CustomDataKey", "custom_data_key"]:
+                if c in ud_cols:
+                    cdk_col = c
+                    break
+
+            if cdk_col:
+                # Filter: CustomDataKey = lower(ItemId) — the canonical row
+                # This avoids double-counting from duplicate rows.
+                # We use LOWER() on both sides for case-insensitive match.
+                ud_query = f"""
+                    SELECT "{ud_col_map["item_id"]}" AS item_id,
+                           MAX(CAST("{ud_col_map["play_count"]}" AS INTEGER)) AS total_plays,
+                           MAX("{ud_col_map["last_played"]}") AS last_played
+                    FROM {user_data_table}
+                    {user_filter}
+                    {"AND" if user_filter else "WHERE"} LOWER("{cdk_col}") = LOWER("{ud_col_map["item_id"]}")
+                    GROUP BY "{ud_col_map["item_id"]}"
+                    HAVING total_plays > 0;
+                """
+            else:
+                # No CustomDataKey column — use MAX (not SUM) to avoid double-count
+                ud_query = f"""
+                    SELECT "{ud_col_map["item_id"]}" AS item_id,
+                           MAX(CAST("{ud_col_map["play_count"]}" AS INTEGER)) AS total_plays,
+                           MAX("{ud_col_map["last_played"]}") AS last_played
+                    FROM {user_data_table}
+                    {user_filter}
+                    GROUP BY "{ud_col_map["item_id"]}"
+                    HAVING total_plays > 0;
+                """
+            log(f"Leyendo play counts (con deduplicación por CustomDataKey)...")
 
             cursor = conn.execute(ud_query, params)
             play_data_found = 0
@@ -336,32 +361,100 @@ def read_jellyfin_data(conn, user_id=None):
 
             log(f"Encontrados play counts para {play_data_found} items")
 
-    # Read genres and artists from ItemValues table (if it exists)
+    # Read genres and artists from ItemValues table.
+    # IMPORTANT: Jellyfin 10.11 uses a normalized schema:
+    #   - ItemValues (ItemValueId, Type, Value, CleanValue) — no ItemId here
+    #   - ItemValuesMap (ItemId, ItemValueId) — junction table
+    # We need to JOIN these two to get (ItemId, Type, Value).
+    #
+    # Fallback for older Jellyfin: ItemValues has ItemId directly.
     if item_values_table:
         iv_cols = get_columns(conn, item_values_table)
         log(f"Tabla de item values: {item_values_table}, columnas: {sorted(iv_cols)}")
 
         iv_col_map = {}
         for field, candidates in [
-            ("type", ["Type", "type", "ItemValueId"]),
+            ("type", ["Type", "type"]),
             ("value", ["Value", "value"]),
             ("item_id", ["ItemId", "item_id"]),
+            ("item_value_id", ["ItemValueId", "item_value_id"]),
         ]:
             for c in candidates:
                 if c in iv_cols:
                     iv_col_map[field] = c
                     break
 
-        if "value" in iv_col_map and "item_id" in iv_col_map:
+        # Check if ItemValuesMap junction table exists
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name = 'ItemValuesMap';")
+        has_iv_map = cursor.fetchone() is not None
+
+        if has_iv_map:
+            log("Encontrada tabla ItemValuesMap (esquema normalizado de Jellyfin 10.11)")
+            iv_map_cols = get_columns(conn, "ItemValuesMap")
+            ivm_item_col = None
+            for c in ["ItemId", "item_id"]:
+                if c in iv_map_cols:
+                    ivm_item_col = c
+                    break
+            ivm_ivid_col = None
+            for c in ["ItemValueId", "item_value_id"]:
+                if c in iv_map_cols:
+                    ivm_ivid_col = c
+                    break
+
+            if "value" in iv_col_map and "type" in iv_col_map and ivm_item_col and ivm_ivid_col and "item_value_id" in iv_col_map:
+                # JOIN ItemValuesMap + ItemValues
+                # Jellyfin 10.11 ItemValueType: Artist=0, AlbumArtist=1, Genre=2
+                # Genres (Type = 2)
+                genre_query = f"""
+                    SELECT iv."{iv_col_map["value"]}" AS value, ivm."{ivm_item_col}" AS item_id
+                    FROM ItemValuesMap ivm
+                    JOIN {item_values_table} iv ON iv."{iv_col_map["item_value_id"]}" = ivm."{ivm_ivid_col}"
+                    WHERE iv."{iv_col_map["type"]}" = 2;
+                """
+                try:
+                    cursor = conn.execute(genre_query)
+                    genre_count = 0
+                    for row in cursor.fetchall():
+                        genre = row[0]
+                        item_id = str(row[1]).strip() if row[1] else ""
+                        if genre and item_id in items:
+                            items[item_id]["genres"].append(genre)
+                            genre_count += 1
+                    log(f"Encontradas {genre_count} asignaciones de género (vía ItemValuesMap)")
+                except Exception as e:
+                    log(f"No se pudieron leer géneros vía ItemValuesMap: {e}", "WARN")
+
+                # Artists (Type = 0 = Artist, Type = 1 = AlbumArtist)
+                artist_query = f"""
+                    SELECT iv."{iv_col_map["value"]}" AS value, ivm."{ivm_item_col}" AS item_id, iv."{iv_col_map["type"]}" AS vtype
+                    FROM ItemValuesMap ivm
+                    JOIN {item_values_table} iv ON iv."{iv_col_map["item_value_id"]}" = ivm."{ivm_ivid_col}"
+                    WHERE iv."{iv_col_map["type"]}" IN (0, 1);
+                """
+                try:
+                    cursor = conn.execute(artist_query)
+                    artist_count = 0
+                    for row in cursor.fetchall():
+                        artist = row[0]
+                        item_id = str(row[1]).strip() if row[1] else ""
+                        if artist and item_id in items:
+                            items[item_id]["artists"].append(artist)
+                            artist_count += 1
+                    log(f"Encontradas {artist_count} asignaciones de artista (vía ItemValuesMap)")
+                except Exception as e:
+                    log(f"No se pudieron leer artistas vía ItemValuesMap: {e}", "WARN")
+
+        elif "value" in iv_col_map and "item_id" in iv_col_map:
+            # Older Jellyfin: ItemValues has ItemId directly
+            log("ItemValuesMap no existe. Usando ItemValues con ItemId directo (esquema antiguo)")
             type_col = iv_col_map.get("type")
             if type_col:
-                # Jellyfin 10.11 ItemValueType mapping (from ItemValueType.cs):
-                #   Artist = 0, AlbumArtist = 1, Genre = 2
-                # Read genres (Type = 2)
+                # Genres (Type = 2)
                 genre_query = f"""
                     SELECT "{iv_col_map["value"]}", "{iv_col_map["item_id"]}"
                     FROM {item_values_table}
-                    WHERE "{type_col}" = 2 OR "{type_col}" = 'Genre' OR "{type_col}" = 'genre';
+                    WHERE "{type_col}" = 2;
                 """
                 try:
                     cursor = conn.execute(genre_query)
@@ -374,13 +467,13 @@ def read_jellyfin_data(conn, user_id=None):
                             genre_count += 1
                     log(f"Encontradas {genre_count} asignaciones de género")
                 except Exception as e:
-                    log(f"No se pudieron leer géneros con filtro de tipo: {e}", "WARN")
+                    log(f"No se pudieron leer géneros: {e}", "WARN")
 
-                # Read artists (Type = 0 = Artist, Type = 1 = AlbumArtist)
+                # Artists (Type = 0 = Artist, Type = 1 = AlbumArtist)
                 artist_query = f"""
-                    SELECT "{iv_col_map["value"]}", "{iv_col_map["item_id"]}", "{type_col}"
+                    SELECT "{iv_col_map["value"]}", "{iv_col_map["item_id"]}"
                     FROM {item_values_table}
-                    WHERE "{type_col}" IN (0, 1) OR "{type_col}" IN ('Artist', 'artist', 'AlbumArtist', 'album_artist');
+                    WHERE "{type_col}" IN (0, 1);
                 """
                 try:
                     cursor = conn.execute(artist_query)
@@ -393,7 +486,7 @@ def read_jellyfin_data(conn, user_id=None):
                             artist_count += 1
                     log(f"Encontradas {artist_count} asignaciones de artista")
                 except Exception as e:
-                    log(f"No se pudieron leer artistas con filtro de tipo: {e}", "WARN")
+                    log(f"No se pudieron leer artistas: {e}", "WARN")
 
     # Filter out items with no play count
     items_with_plays = {k: v for k, v in items.items() if v["play_count"] > 0}

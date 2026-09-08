@@ -167,9 +167,75 @@ def read_jellyfin_metadata(conn):
             if c in iv_cols:
                 iv_item_col = c
                 break
+        iv_ivid_col = None
+        for c in ["ItemValueId", "item_value_id"]:
+            if c in iv_cols:
+                iv_ivid_col = c
+                break
 
-        if iv_value_col and iv_item_col:
-            # Read ALL item values and classify by trying each type
+        # Check if ItemValuesMap junction table exists (Jellyfin 10.11)
+        cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name = 'ItemValuesMap';")
+        has_iv_map = cursor.fetchone() is not None
+
+        if has_iv_map and iv_ivid_col:
+            # Jellyfin 10.11 normalized schema: JOIN ItemValuesMap + ItemValues
+            log("Usando ItemValuesMap (esquema normalizado de Jellyfin 10.11)")
+            iv_map_cols = get_columns(conn, "ItemValuesMap")
+            ivm_item_col = None
+            for c in ["ItemId", "item_id"]:
+                if c in iv_map_cols:
+                    ivm_item_col = c
+                    break
+            ivm_ivid_col = None
+            for c in ["ItemValueId", "item_value_id"]:
+                if c in iv_map_cols:
+                    ivm_ivid_col = c
+                    break
+
+            if iv_value_col and iv_type_col and ivm_item_col and ivm_ivid_col:
+                # Jellyfin 10.11 ItemValueType: Artist=0, AlbumArtist=1, Genre=2
+                log("Leyendo géneros (Type=2) vía ItemValuesMap...")
+                cursor = conn.execute(f"""
+                    SELECT iv."{iv_value_col}" AS value, ivm."{ivm_item_col}" AS item_id
+                    FROM ItemValuesMap ivm
+                    JOIN {iv_table} iv ON iv."{iv_ivid_col}" = ivm."{ivm_ivid_col}"
+                    WHERE iv."{iv_type_col}" = 2;
+                """)
+                genre_count = 0
+                for row in cursor.fetchall():
+                    genre = row[0]
+                    item_id = str(row[1]).strip() if row[1] else ""
+                    if genre and item_id in audio_guids:
+                        if item_id not in metadata:
+                            metadata[item_id] = {"artists": [], "genres": [], "album_artist": None}
+                        metadata[item_id]["genres"].append(genre)
+                        genre_count += 1
+                log(f"Encontradas {genre_count} asignaciones de género")
+
+                log("Leyendo artistas (Type=0,1) vía ItemValuesMap...")
+                cursor = conn.execute(f"""
+                    SELECT iv."{iv_value_col}" AS value, ivm."{ivm_item_col}" AS item_id, iv."{iv_type_col}" AS vtype
+                    FROM ItemValuesMap ivm
+                    JOIN {iv_table} iv ON iv."{iv_ivid_col}" = ivm."{ivm_ivid_col}"
+                    WHERE iv."{iv_type_col}" IN (0, 1);
+                """)
+                artist_count = 0
+                for row in cursor.fetchall():
+                    artist = row[0]
+                    item_id = str(row[1]).strip() if row[1] else ""
+                    type_val = row[2]
+                    if artist and item_id in audio_guids:
+                        if item_id not in metadata:
+                            metadata[item_id] = {"artists": [], "genres": [], "album_artist": None}
+                        metadata[item_id]["artists"].append(artist)
+                        if type_val in (1, "1"):
+                            metadata[item_id]["album_artist"] = artist
+                        artist_count += 1
+                log(f"Encontradas {artist_count} asignaciones de artista")
+
+        elif iv_value_col and iv_item_col:
+            # Older Jellyfin: ItemValues has ItemId directly
+            log("ItemValuesMap no existe. Usando ItemValues con ItemId directo (esquema antiguo)")
             log("Leyendo ItemValues (todos los tipos)...")
             cursor = conn.execute(f"""
                 SELECT "{iv_item_col}", "{iv_value_col}", "{iv_type_col}"
@@ -179,18 +245,7 @@ def read_jellyfin_metadata(conn):
             iv_rows = cursor.fetchall()
             log(f"ItemValues: {len(iv_rows)} filas totales")
 
-            # Count by type to understand the schema
-            type_counts = {}
-            for row in iv_rows:
-                t = row[2]
-                type_counts[t] = type_counts.get(t, 0) + 1
-            log(f"Distribución de tipos en ItemValues: {type_counts}")
-
-            # Heuristic: the type with the MOST values is usually Genre (type 0),
-            # the second most is Artist (type 1). We try multiple approaches:
-
-            # Approach 1: Jellyfin 10.11 standard types
-            #   0 = Artist, 1 = AlbumArtist, 2 = Genre
+            # Jellyfin 10.11 mapping: Artist=0, AlbumArtist=1, Genre=2
             for row in iv_rows:
                 item_id = str(row[0]).strip() if row[0] else ""
                 value = row[1]
@@ -202,8 +257,6 @@ def read_jellyfin_metadata(conn):
                 if item_id not in metadata:
                     metadata[item_id] = {"artists": [], "genres": [], "album_artist": None}
 
-                # Jellyfin 10.11 mapping (from ItemValueType.cs):
-                #   Artist = 0, AlbumArtist = 1, Genre = 2
                 if type_val in (2, "2", "Genre", "genre"):
                     metadata[item_id]["genres"].append(value)
                 elif type_val in (0, "0", "Artist", "artist"):
@@ -212,43 +265,7 @@ def read_jellyfin_metadata(conn):
                     metadata[item_id]["artists"].append(value)
                     metadata[item_id]["album_artist"] = value
 
-            log(f"Metadata extraída para {len(metadata)} items (Approach 1)")
-
-            # Approach 2: if Approach 1 found very few, try classifying by
-            # counting which type has the most values = Genre, second = Artist
-            total_with_data = sum(1 for m in metadata.values() if m["artists"] or m["genres"])
-            if total_with_data < len(audio_guids) * 0.1:
-                log("Approach 1 encontró pocos datos. Intentando Approach 2...", "WARN")
-                # Sort types by frequency
-                sorted_types = sorted(type_counts.items(), key=lambda x: -x[1])
-                if len(sorted_types) >= 2:
-                    genre_type = sorted_types[0][0]
-                    artist_type = sorted_types[1][0]
-                    log(f"Assuming type {genre_type} = Genre, type {artist_type} = Artist")
-
-                    metadata2 = {}
-                    for row in iv_rows:
-                        item_id = str(row[0]).strip() if row[0] else ""
-                        value = row[1]
-                        type_val = row[2]
-
-                        if not item_id or not value or item_id not in audio_guids:
-                            continue
-
-                        if item_id not in metadata2:
-                            metadata2[item_id] = {"artists": [], "genres": [], "album_artist": None}
-
-                        if type_val == genre_type:
-                            metadata2[item_id]["genres"].append(value)
-                        elif type_val == artist_type:
-                            metadata2[item_id]["artists"].append(value)
-
-                    metadata2_count = sum(1 for m in metadata2.values() if m["artists"] or m["genres"])
-                    log(f"Approach 2 encontró metadata para {metadata2_count} items")
-
-                    if metadata2_count > total_with_data:
-                        log("Approach 2 es mejor, usándola")
-                        metadata = metadata2
+            log(f"Metadata extraída para {len(metadata)} items")
 
     # Approach 3: try reading from Data column (serialized JSON)
     if has_data and len(metadata) < len(audio_guids) * 0.5:
