@@ -5,9 +5,9 @@
   "overview": "Estadisticas de musica independientes: Top 50 y Bottom 50 por cancion/artista/album/genero en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. Purga automatica a los 14 meses con archivo historico anual.",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "0.0.0.13",
-  "changelog": "- NEW: Pestaña 'Gráficos' con 4 sub-pestañas (Estadísticas, Portadas, Recap, Gamificación).\n- NEW: 6 gráficos en la sub-pestaña Estadísticas usando Chart.js: (1) Línea de tiempo de reproducciones por día, (2) Heatmap de actividad estilo GitHub, (3) Gráfico radial por hora del día, (4) Gráfico radial por día de la semana, (5) Treemap de géneros (top 10 + Otros), (6) Bubble chart de artistas por popularidad vs diversidad.\n- NEW: Sub-pestaña Gamificación con racha de días consecutivos (estilo Duolingo).\n- NEW: 7 endpoints de API para datos de gráficos (/Charts/Timeline, /Charts/Heatmap, /Charts/ByHour, /Charts/ByDayOfWeek, /Charts/GenreTreemap, /Charts/ArtistBubbles, /Charts/Streak).\n- NEW: ChartService con consultas optimizadas y cacheadas.\n- Sub-pestañas Portadas y Recap disponibles en v0.0.0.14.",
+  "version": "0.0.0.14",
+  "changelog": "- FIXED: Heatmap ahora respeta la ventana temporal seleccionada (antes siempre 12 meses).\n- FIXED: Heatmap con escala de colores dinamica basada en el valor maximo. Verde oscuro = menos, verde brillante = maximo.\n- FIXED: Graficos de hora y dia cambiados de polarArea (circular) a barras (mas legibles).\n- FIXED: Tamano de fuente +2 en todos los textos de graficos (ejes, leyendas, tooltips).\n- FIXED: Boton 'Actualizar graficos' ahora ocupa su propia fila (clase block).\n- NEW: Sub-pestaña Portadas: album del mes (top 3), artista del mes (top 3), collage de top 50 albumes, descubrimientos recientes.\n- NEW: Sub-pestaña Recap: tarjetas de resumen (top genero/artista/cancion, totales), comparativa de trimestres por genero, evolucion de top 5 generos por mes.\n- NEW: 4 endpoints: /Charts/Recap, /Charts/QuarterCompare, /Charts/GenreEvolution, /Charts/Discoveries.\n- NEW: ChartService con metodos GetRecap, GetQuarterCompare, GetGenreEvolution, GetDiscoveries.",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-09-08T05:30:00Z",
+  "timestamp": "2026-09-08T06:30:00Z",
   "imagePath": "logo.png"
 }

@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-estadisticas/main/logo.png",
     "versions": [
       {
+        "version": "0.0.0.14",
+        "changelog": "- FIXED: Heatmap respeta ventana temporal + escala dinamica de colores.\n- FIXED: Graficos de hora/dia cambiados a barras (mas legibles).\n- FIXED: Tamano de fuente +2 en todos los textos de graficos.\n- FIXED: Boton Actualizar graficos en su propia fila.\n- NEW: Sub-pestaña Portadas: album/artista del mes, collage, descubrimientos.\n- NEW: Sub-pestaña Recap: tarjetas, comparativa trimestral, evolucion de generos.\n- NEW: 4 endpoints /Charts/Recap, /Charts/QuarterCompare, /Charts/GenreEvolution, /Charts/Discoveries.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-estadisticas/releases/download/v0.0.0.14/jellyfin-plugin-estadisticas_0.0.0.14.zip",
+        "checksum": "DDC3C19DFE5CA612DA57B48D91E2C2EE",
+        "timestamp": "2026-09-08T06:30:00Z"
+      },
+      {
         "version": "0.0.0.13",
         "changelog": "- NEW: Pestaña 'Gráficos' con 4 sub-pestañas (Estadísticas, Portadas, Recap, Gamificación).\n- NEW: 6 gráficos en Estadísticas usando Chart.js: línea de tiempo, heatmap, radial por hora, radial por día, treemap de géneros, bubble chart de artistas.\n- NEW: Racha de días consecutivos en Gamificación.\n- NEW: 7 endpoints /Charts/* + ChartService.\n- Sub-pestañas Portadas y Recap en v0.0.0.14.",
         "targetAbi": "10.11.0.0",

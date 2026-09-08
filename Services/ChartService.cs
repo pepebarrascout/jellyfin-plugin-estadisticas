@@ -260,7 +260,6 @@ public sealed class ChartService
             var result = new Dictionary<string, object>();
             using var conn = _db.OpenMain();
             using var cmd = conn.CreateCommand();
-            // Get all distinct play dates (server-local), ordered
             cmd.CommandText = "SELECT DISTINCT substr(played_at, 1, 10) AS day FROM plays ORDER BY day;";
             var dates = new List<DateTime>();
             using var reader = cmd.ExecuteReader();
@@ -277,7 +276,6 @@ public sealed class ChartService
                 return result;
             }
 
-            // Calculate longest streak
             int longest = 1, current = 1;
             for (int i = 1; i < dates.Count; i++)
             {
@@ -287,12 +285,9 @@ public sealed class ChartService
                     if (current > longest) longest = current;
                 }
                 else
-                {
                     current = 1;
-                }
             }
 
-            // Calculate current streak (from the last date backwards)
             int currentStreak = 1;
             for (int i = dates.Count - 1; i > 0; i--)
             {
@@ -302,18 +297,251 @@ public sealed class ChartService
                     break;
             }
 
-            // Check if the last date is today or yesterday (otherwise streak is 0)
             var today = ServerClock.NowLocal().Date;
             var lastDate = dates[dates.Count - 1];
             if ((today - lastDate).Days > 1)
-            {
-                currentStreak = 0; // Streak broken
-            }
+                currentStreak = 0;
 
             result["currentStreak"] = currentStreak;
             result["longestStreak"] = longest;
             result["lastPlayDate"] = lastDate.ToString("yyyy-MM-dd");
             return result;
         });
+    }
+
+    /// <summary>
+    /// Recap data: top genre, top artist, top song, totals for the current quarter.
+    /// </summary>
+    public Dictionary<string, object> GetRecap()
+    {
+        return _cache.GetOrSet("Chart:Recap", () =>
+        {
+            var result = new Dictionary<string, object>();
+            var now = ServerClock.NowLocal();
+            var quarterStart = GetQuarterStart(now);
+            var quarterStartUtc = ServerClock.ToUtc(quarterStart).ToString("o");
+
+            using var conn = _db.OpenMain();
+
+            // Top genre
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"SELECT tg.genre, COUNT(*) AS c FROM plays p
+                    JOIN track_genres tg ON tg.item_id = p.item_id
+                    WHERE p.played_at >= @s GROUP BY tg.genre ORDER BY c DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@s", quarterStartUtc);
+                using var r = cmd.ExecuteReader();
+                result["topGenre"] = r.Read() ? r.GetString(0) : null;
+            }
+
+            // Top artist
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"SELECT ta.artist, COUNT(*) AS c FROM plays p
+                    JOIN track_artists ta ON ta.item_id = p.item_id
+                    WHERE p.played_at >= @s GROUP BY ta.artist ORDER BY c DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@s", quarterStartUtc);
+                using var r = cmd.ExecuteReader();
+                result["topArtist"] = r.Read() ? r.GetString(0) : null;
+            }
+
+            // Top song
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"SELECT t.name, COUNT(*) AS c FROM plays p
+                    JOIN tracks t ON t.item_id = p.item_id
+                    WHERE p.played_at >= @s GROUP BY t.item_id, t.name ORDER BY c DESC LIMIT 1;";
+                cmd.Parameters.AddWithValue("@s", quarterStartUtc);
+                using var r = cmd.ExecuteReader();
+                result["topSong"] = r.Read() ? r.GetString(0) : null;
+            }
+
+            // Total plays
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(*) FROM plays WHERE played_at >= @s;";
+                cmd.Parameters.AddWithValue("@s", quarterStartUtc);
+                result["totalPlays"] = (long)cmd.ExecuteScalar();
+            }
+
+            // Total duration
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"SELECT COALESCE(SUM(t.duration_ms), 0) FROM plays p
+                    JOIN tracks t ON t.item_id = p.item_id WHERE p.played_at >= @s;";
+                cmd.Parameters.AddWithValue("@s", quarterStartUtc);
+                result["totalDurationMs"] = (long)cmd.ExecuteScalar();
+            }
+
+            // Distinct songs
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT COUNT(DISTINCT item_id) FROM plays WHERE played_at >= @s;";
+                cmd.Parameters.AddWithValue("@s", quarterStartUtc);
+                result["distinctSongs"] = (long)cmd.ExecuteScalar();
+            }
+
+            return result;
+        });
+    }
+
+    /// <summary>
+    /// Quarter comparison: top 10 genres, current quarter vs previous quarter.
+    /// </summary>
+    public Dictionary<string, object> GetQuarterCompare()
+    {
+        return _cache.GetOrSet("Chart:QuarterCompare", () =>
+        {
+            var result = new Dictionary<string, object>();
+            var now = ServerClock.NowLocal();
+            var currentStart = GetQuarterStart(now);
+            var previousStart = currentStart.AddMonths(-3);
+            var currentStartUtc = ServerClock.ToUtc(currentStart).ToString("o");
+            var previousStartUtc = ServerClock.ToUtc(previousStart).ToString("o");
+            var previousEndUtc = currentStartUtc;
+
+            using var conn = _db.OpenMain();
+
+            // Get top 10 genres across both quarters combined
+            var genres = new List<string>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = $@"
+                    SELECT tg.genre, COUNT(*) AS c FROM plays p
+                    JOIN track_genres tg ON tg.item_id = p.item_id
+                    WHERE p.played_at >= @ps GROUP BY tg.genre ORDER BY c DESC LIMIT 10;";
+                cmd.Parameters.AddWithValue("@ps", previousStartUtc);
+                using var r = cmd.ExecuteReader();
+                while (r.Read()) genres.Add(r.GetString(0));
+            }
+
+            // Current quarter plays per genre
+            var current = new List<long>();
+            var previous = new List<long>();
+            foreach (var g in genres)
+            {
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"SELECT COUNT(*) FROM plays p
+                    JOIN track_genres tg ON tg.item_id = p.item_id
+                    WHERE p.played_at >= @cs AND tg.genre = @g;";
+                cmd.Parameters.AddWithValue("@cs", currentStartUtc);
+                cmd.Parameters.AddWithValue("@g", g);
+                current.Add((long)cmd.ExecuteScalar());
+
+                cmd.Parameters.Clear();
+                cmd.CommandText = @"SELECT COUNT(*) FROM plays p
+                    JOIN track_genres tg ON tg.item_id = p.item_id
+                    WHERE p.played_at >= @ps AND p.played_at < @pe AND tg.genre = @g;";
+                cmd.Parameters.AddWithValue("@ps", previousStartUtc);
+                cmd.Parameters.AddWithValue("@pe", previousEndUtc);
+                cmd.Parameters.AddWithValue("@g", g);
+                previous.Add((long)cmd.ExecuteScalar());
+            }
+
+            result["genres"] = genres;
+            result["current"] = current;
+            result["previous"] = previous;
+            return result;
+        });
+    }
+
+    /// <summary>
+    /// Genre evolution: top 5 genres, plays per month, last 12 months.
+    /// Returns months[], genres[], and series{genre: [plays per month]}.
+    /// </summary>
+    public Dictionary<string, object> GetGenreEvolution()
+    {
+        return _cache.GetOrSet("Chart:GenreEvolution", () =>
+        {
+            var result = new Dictionary<string, object>();
+            var now = ServerClock.NowLocal();
+            var months = new List<string>();
+            var monthStarts = new List<DateTime>();
+
+            for (int i = 11; i >= 0; i--)
+            {
+                var mStart = new DateTime(now.Year, now.Month, 1).AddMonths(-i);
+                monthStarts.Add(mStart);
+                months.Add(mStart.ToString("MMM yyyy"));
+            }
+
+            using var conn = _db.OpenMain();
+
+            // Find top 5 genres across the full 12-month range
+            var topGenres = new List<string>();
+            var rangeStart = ServerClock.ToUtc(monthStarts[0]).ToString("o");
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"SELECT tg.genre, COUNT(*) AS c FROM plays p
+                    JOIN track_genres tg ON tg.item_id = p.item_id
+                    WHERE p.played_at >= @s GROUP BY tg.genre ORDER BY c DESC LIMIT 5;";
+                cmd.Parameters.AddWithValue("@s", rangeStart);
+                using var r = cmd.ExecuteReader();
+                while (r.Read()) topGenres.Add(r.GetString(0));
+            }
+
+            // For each genre, get plays per month
+            var series = new Dictionary<string, List<long>>();
+            foreach (var g in topGenres)
+            {
+                var counts = new List<long>();
+                for (int i = 0; i < 12; i++)
+                {
+                    var ms = ServerClock.ToUtc(monthStarts[i]).ToString("o");
+                    var me = i < 11 ? ServerClock.ToUtc(monthStarts[i + 1]).ToString("o") : DateTime.UtcNow.ToString("o");
+                    using var cmd = conn.CreateCommand();
+                    cmd.CommandText = @"SELECT COUNT(*) FROM plays p
+                        JOIN track_genres tg ON tg.item_id = p.item_id
+                        WHERE p.played_at >= @ms AND p.played_at < @me AND tg.genre = @g;";
+                    cmd.Parameters.AddWithValue("@ms", ms);
+                    cmd.Parameters.AddWithValue("@me", me);
+                    cmd.Parameters.AddWithValue("@g", g);
+                    counts.Add((long)cmd.ExecuteScalar());
+                }
+                series[g] = counts;
+            }
+
+            result["months"] = months;
+            result["genres"] = topGenres;
+            result["series"] = series;
+            return result;
+        });
+    }
+
+    /// <summary>
+    /// Discoveries: songs first seen (first_seen) in the last N months.
+    /// Returns [{itemId, name, albumArtist}].
+    /// </summary>
+    public List<Dictionary<string, object>> GetDiscoveries(int months)
+    {
+        var cacheKey = $"Chart:Discoveries:{months}";
+        return _cache.GetOrSet(cacheKey, () =>
+        {
+            var result = new List<Dictionary<string, object>>();
+            var cutoff = DateTime.UtcNow.AddMonths(-months).ToString("o");
+            using var conn = _db.OpenMain();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"SELECT item_id, name, album_artist FROM tracks
+                WHERE first_seen >= @c ORDER BY first_seen DESC LIMIT 50;";
+            cmd.Parameters.AddWithValue("@c", cutoff);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(new Dictionary<string, object>
+                {
+                    ["itemId"] = reader.GetString(0),
+                    ["name"] = reader.IsDBNull(1) ? "" : reader.GetString(1),
+                    ["albumArtist"] = reader.IsDBNull(2) ? null : reader.GetString(2)
+                });
+            }
+            return result;
+        });
+    }
+
+    private static DateTime GetQuarterStart(DateTime now)
+    {
+        var month = now.Month;
+        var quarterMonth = ((month - 1) / 3) * 3 + 1; // 1, 4, 7, 10
+        return new DateTime(now.Year, quarterMonth, 1, 0, 0, 0);
     }
 }

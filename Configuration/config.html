@@ -317,7 +317,9 @@
                                 <option value="last_year">Año anterior</option>
                             </select>
                         </div>
-                        <button is="emby-button" type="button" class="raised button-submit" id="chartsRefresh">Actualizar gráficos</button>
+                    </div>
+                    <div style="margin-bottom: 1em;">
+                        <button is="emby-button" type="button" class="raised button-submit block" id="chartsRefresh">Actualizar gráficos</button>
                     </div>
 
                     <h3>Línea de tiempo de reproducciones</h3>
@@ -352,14 +354,37 @@
                     </div>
                 </div>
 
-                <!-- Sub-tab: Portadas (placeholder) -->
+                <!-- Sub-tab: Portadas -->
                 <div id="subtab-portadas" class="graficoSubPanel" style="display: none;">
-                    <div class="fieldDescription">Collages de portadas, álbum/artista del mes, y descubrimientos recientes. Disponible en v0.0.0.14.</div>
+                    <h3>Álbum del mes</h3>
+                    <div id="albumOfMonthContainer" style="display: flex; gap: 1em; flex-wrap: wrap; margin-bottom: 2em;"></div>
+
+                    <h3>Artista del mes</h3>
+                    <div id="artistOfMonthContainer" style="display: flex; gap: 1em; flex-wrap: wrap; margin-bottom: 2em;"></div>
+
+                    <h3>Collage de Top 50 álbumes (últimos 12 meses)</h3>
+                    <div id="albumCollageContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5em; margin-bottom: 2em;"></div>
+
+                    <h3>Descubrimientos recientes (último mes)</h3>
+                    <div id="discoveriesContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5em;"></div>
                 </div>
 
-                <!-- Sub-tab: Recap (placeholder) -->
+                <!-- Sub-tab: Recap -->
                 <div id="subtab-recap" class="graficoSubPanel" style="display: none;">
-                    <div class="fieldDescription">Recap anual estilo Spotify Wrapped. Disponible en v0.0.0.14.</div>
+                    <div class="fieldDescription" style="margin-bottom: 1em;">Resumen del trimestre actual vs. trimestre anterior. Cuando el plugin pase a producción, se cambiará a comparación anual.</div>
+
+                    <h3>Tarjetas de resumen</h3>
+                    <div id="recapCardsContainer" style="display: flex; gap: 1em; flex-wrap: wrap; margin-bottom: 2em;"></div>
+
+                    <h3>Comparativa de trimestres por género</h3>
+                    <div style="background: #1a1a1a; border-radius: 6px; padding: 1em; margin-bottom: 1.5em;">
+                        <canvas id="chartQuarterCompare" height="100"></canvas>
+                    </div>
+
+                    <h3>Evolución de top 5 géneros por mes</h3>
+                    <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
+                        <canvas id="chartGenreEvolution" height="100"></canvas>
+                    </div>
                 </div>
 
                 <!-- Sub-tab: Gamificación (streak + badges) -->
@@ -1264,6 +1289,8 @@
                 const sub = btn.getAttribute('data-subtab');
                 document.getElementById('subtab-' + sub).style.display = '';
                 if (sub === 'estadisticas') loadCharts();
+                if (sub === 'portadas') loadPortadas();
+                if (sub === 'recap') loadRecap();
                 if (sub === 'gamificacion') loadStreak();
             });
         });
@@ -1282,9 +1309,12 @@
                 if (r1.success) renderTimeline(r1.data);
             } catch (e) {}
 
-            // Heatmap (always 12 months)
+            // Heatmap — respects window selector, calculates months from window
             try {
-                const r2 = await apiGet('/Charts/Heatmap?months=12');
+                // Map window to months for heatmap range
+                const monthsMap = { '2w': 1, '1m': 1, '3m': 3, '6m': 6, '12m': 12, 'last_year': 12 };
+                const months = monthsMap[win] || 12;
+                const r2 = await apiGet('/Charts/Heatmap?months=' + months);
                 if (r2.success) renderHeatmap(r2.data);
             } catch (e) {}
 
@@ -1322,7 +1352,7 @@
             timelineChart = new Chart(ctx, {
                 type: 'line',
                 data: { labels, datasets: [{ label: 'Reproducciones por día', data: counts, borderColor: '#00a4dc', backgroundColor: 'rgba(0,164,220,0.1)', fill: true, tension: 0.3 }] },
-                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888', maxTicksLimit: 12 } }, y: { ticks: { color: '#888' }, beginAtZero: true } } }
+                options: { responsive: true, plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } }, scales: { x: { ticks: { color: '#aaa', font: { size: 13 }, maxTicksLimit: 12 } }, y: { title: { display: true, text: 'Reproducciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true } } }
             });
         }
 
@@ -1332,17 +1362,27 @@
             // Build a map: date -> count
             const map = {};
             data.forEach(d => { map[d.date] = d.count; });
+            // Find max value for dynamic color scale
+            const maxCount = Math.max(1, ...Object.values(map));
+
             // Build grid: weeks as columns, days as rows (Mon-Sun)
             const today = new Date();
             const startDate = new Date(today);
             startDate.setDate(startDate.getDate() - 364); // ~52 weeks back
-            // Align to Monday
             const dayOfWeek = (startDate.getDay() + 6) % 7;
             startDate.setDate(startDate.getDate() - dayOfWeek);
 
             const dayLabels = ['Lun', '', 'Mié', '', 'Vie', '', 'Dom'];
             const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-            const colors = ['#1a1a1a', '#0d4429', '#0a7d3e', '#11b849', '#22cc55', '#44ee66', '#66ff77'];
+
+            // Dynamic color: interpolate from dark (#0d1a14) to bright (#00ff66) based on count/maxCount
+            function heatColor(count) {
+                if (count === 0) return '#1a1a1a';
+                const ratio = Math.min(1, count / maxCount);
+                // HSL: hue=140 (green), saturation=100%, lightness from 15% (dark) to 55% (bright)
+                const lightness = 15 + ratio * 40;
+                return 'hsl(140, 100%, ' + lightness + '%)';
+            }
 
             let html = '<div style="display: inline-block;">';
             // Month labels
@@ -1353,7 +1393,7 @@
                 d.setDate(d.getDate() + w * 7);
                 const m = d.getMonth();
                 if (m !== lastMonth) {
-                    html += '<div style="width: 13px; font-size: 0.7em; color: #888; margin-right: 1px;">' + monthLabels[m] + '</div>';
+                    html += '<div style="width: 13px; font-size: 0.8em; color: #888; margin-right: 1px;">' + monthLabels[m] + '</div>';
                     lastMonth = m;
                 } else {
                     html += '<div style="width: 13px; margin-right: 1px;"></div>';
@@ -1362,11 +1402,9 @@
             html += '</div>';
             // Grid
             html += '<div style="display: flex;">';
-            // Day labels
             html += '<div style="display: flex; flex-direction: column; margin-right: 0.3em;">';
-            dayLabels.forEach(l => { html += '<div style="height: 13px; width: 2em; font-size: 0.7em; color: #888; line-height: 13px;">' + l + '</div>'; });
+            dayLabels.forEach(l => { html += '<div style="height: 13px; width: 2em; font-size: 0.8em; color: #888; line-height: 13px;">' + l + '</div>'; });
             html += '</div>';
-            // Weeks
             for (let w = 0; w < 53; w++) {
                 html += '<div style="display: flex; flex-direction: column;">';
                 for (let d = 0; d < 7; d++) {
@@ -1377,18 +1415,21 @@
                     } else {
                         const dateStr = cellDate.toISOString().substring(0, 10);
                         const count = map[dateStr] || 0;
-                        const colorIdx = count === 0 ? 0 : Math.min(6, Math.ceil(count / 5));
-                        const bg = colors[colorIdx];
-                        html += '<div style="width: 13px; height: 13px; margin: 1px; background: ' + bg + '; border-radius: 2px;" title="' + dateStr + ': ' + count + ' plays"></div>';
+                        const bg = heatColor(count);
+                        html += '<div style="width: 13px; height: 13px; margin: 1px; background: ' + bg + '; border-radius: 2px;" title="' + dateStr + ': ' + count + ' reproducciones"></div>';
                     }
                 }
                 html += '</div>';
             }
             html += '</div></div>';
-            // Legend
-            html += '<div style="margin-top: 0.5em; display: flex; align-items: center; gap: 0.3em; font-size: 0.8em; color: #888;">Menos';
-            colors.forEach(c => { html += '<div style="width: 13px; height: 13px; background: ' + c + '; border-radius: 2px;"></div>'; });
-            html += 'Más</div>';
+            // Legend with dynamic scale
+            html += '<div style="margin-top: 0.5em; display: flex; align-items: center; gap: 0.3em; font-size: 0.85em; color: #888;">Menos';
+            for (let i = 0; i <= 5; i++) {
+                const ratio = i / 5;
+                const lightness = 15 + ratio * 40;
+                html += '<div style="width: 13px; height: 13px; background: hsl(140, 100%, ' + lightness + '%); border-radius: 2px;"></div>';
+            }
+            html += 'Más (máx: ' + maxCount + ')</div>';
             container.innerHTML = html;
         }
 
@@ -1397,9 +1438,23 @@
             if (!ctx) return;
             if (byHourChart) byHourChart.destroy();
             byHourChart = new Chart(ctx, {
-                type: 'polarArea',
-                data: { labels: data.map(d => d.hour + ':00'), datasets: [{ data: data.map(d => d.count), backgroundColor: data.map((d, i) => 'hsla(' + (i * 15) + ',70%,50%,0.7)') }] },
-                options: { responsive: true, plugins: { legend: { display: false } }, scales: { r: { ticks: { color: '#888' }, grid: { color: '#333' } } } }
+                type: 'bar',
+                data: { labels: data.map(d => String(d.hour)), datasets: [{ label: 'Reproducciones', data: data.map(d => d.count), backgroundColor: data.map((d, i) => {
+                    // Color gradient: cool at night (0-6), warm during day (7-19), cool again (20-23)
+                    const h = d.hour;
+                    if (h < 6 || h >= 22) return 'rgba(40, 60, 120, 0.8)'; // Night blue
+                    if (h < 12) return 'rgba(0, 164, 220, 0.8)'; // Morning cyan
+                    if (h < 18) return 'rgba(240, 180, 40, 0.8)'; // Afternoon gold
+                    return 'rgba(200, 80, 60, 0.8)'; // Evening red
+                }) }] },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } },
+                    scales: {
+                        x: { title: { display: true, text: 'Hora del día', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 }, callback: function(v, i) { return data[i].hour + 'h'; } }, grid: { color: '#333' } },
+                        y: { title: { display: true, text: 'Reproducciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } }
+                    }
+                }
             });
         }
 
@@ -1408,9 +1463,16 @@
             if (!ctx) return;
             if (byDayChart) byDayChart.destroy();
             byDayChart = new Chart(ctx, {
-                type: 'polarArea',
-                data: { labels: data.map(d => d.dayName), datasets: [{ data: data.map(d => d.count), backgroundColor: ['rgba(0,164,220,0.7)', 'rgba(0,200,180,0.7)', 'rgba(0,220,140,0.7)', 'rgba(100,220,80,0.7)', 'rgba(200,200,40,0.7)', 'rgba(240,160,20,0.7)', 'rgba(240,80,40,0.7)'] }] },
-                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#ccc' } } }, scales: { r: { ticks: { color: '#888' }, grid: { color: '#333' } } } }
+                type: 'bar',
+                data: { labels: data.map(d => d.dayName), datasets: [{ label: 'Reproducciones', data: data.map(d => d.count), backgroundColor: ['rgba(0,164,220,0.8)', 'rgba(0,200,180,0.8)', 'rgba(0,220,140,0.8)', 'rgba(100,220,80,0.8)', 'rgba(200,200,40,0.8)', 'rgba(240,160,20,0.8)', 'rgba(240,80,40,0.8)'] }] },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } },
+                    scales: {
+                        x: { title: { display: true, text: 'Día de la semana', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } },
+                        y: { title: { display: true, text: 'Reproducciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } }
+                    }
+                }
             });
         }
 
@@ -1452,9 +1514,196 @@
                             return d.artist + ': ' + d.totalPlays + ' plays, ' + d.distinctSongs + ' canciones, ' + formatDuration(d.durationMs || 0);
                         } } }
                     },
-                    scales: { x: { title: { display: true, text: 'Reproducciones totales', color: '#ccc' }, ticks: { color: '#888' }, grid: { color: '#333' } }, y: { title: { display: true, text: 'Canciones distintas', color: '#ccc' }, ticks: { color: '#888' }, grid: { color: '#333' } } }
+                    scales: { x: { title: { display: true, text: 'Reproducciones totales', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } }, y: { title: { display: true, text: 'Canciones distintas', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } } }
                 }
             });
+        }
+
+        // --- PORTADAS SUB-TAB ---
+        function imageUrl(itemId, size) {
+            size = size || 200;
+            if (window.ApiClient && window.ApiClient.getUrl) {
+                return window.ApiClient.getUrl('Items/' + itemId + '/Images/Primary', { maxWidth: size, maxHeight: size });
+            }
+            return '';
+        }
+
+        async function loadPortadas() {
+            // Album of month (top 3 albums last month)
+            try {
+                const r = await apiGet('/Query?dimension=Albums&direction=Top&window=1m&limit=3');
+                if (r.success && r.rows.length > 0) {
+                    const container = document.getElementById('albumOfMonthContainer');
+                    let html = '';
+                    const sizes = [180, 140, 110];
+                    r.rows.forEach((album, i) => {
+                        if (!album.ItemId) return; // albums don't have ItemId in aggregated queries
+                        const size = sizes[i] || 100;
+                        const img = imageUrl(album.ItemId, size * 2);
+                        html += '<div style="text-align: center;">';
+                        if (img) html += '<img src="' + img + '" style="width: ' + size + 'px; height: ' + size + 'px; border-radius: 6px; object-fit: cover;" onerror="this.style.display=\'none\'" />';
+                        else html += '<div style="width: ' + size + 'px; height: ' + size + 'px; background: #333; border-radius: 6px; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 2em; color: #666;">album</span></div>';
+                        html += '<div style="font-weight: 600; margin-top: 0.3em;">' + escapeHtml(album.Name) + '</div>';
+                        if (album.Artist) html += '<div class="fieldDescription">' + escapeHtml(album.Artist) + '</div>';
+                        html += '<div class="fieldDescription">' + album.PlayCount + ' reproducciones</div>';
+                        html += '</div>';
+                    });
+                    container.innerHTML = html || '<div class="fieldDescription">Sin datos.</div>';
+                }
+            } catch (e) {}
+
+            // Artist of month (top 3 artists last month) — need itemIds, use Songs dimension
+            try {
+                const r = await apiGet('/Query?dimension=Artists&direction=Top&window=1m&limit=3');
+                if (r.success && r.rows.length > 0) {
+                    const container = document.getElementById('artistOfMonthContainer');
+                    let html = '';
+                    const sizes = [180, 140, 110];
+                    r.rows.forEach((artist, i) => {
+                        const size = sizes[i] || 100;
+                        html += '<div style="text-align: center;">';
+                        html += '<div style="width: ' + size + 'px; height: ' + size + 'px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;"><span class="material-icons" style="font-size: 2em; color: #666;">person</span></div>';
+                        html += '<div style="font-weight: 600; margin-top: 0.3em;">' + escapeHtml(artist.Name) + '</div>';
+                        html += '<div class="fieldDescription">' + artist.PlayCount + ' reproducciones</div>';
+                        html += '</div>';
+                    });
+                    container.innerHTML = html || '<div class="fieldDescription">Sin datos.</div>';
+                }
+            } catch (e) {}
+
+            // Album collage (top 50 albums, 12 months)
+            try {
+                const r = await apiGet('/Query?dimension=Songs&direction=Top&window=12m&limit=50');
+                if (r.success && r.rows.length > 0) {
+                    const container = document.getElementById('albumCollageContainer');
+                    let html = '';
+                    const seen = new Set();
+                    r.rows.forEach(song => {
+                        if (!song.ItemId) return;
+                        const img = imageUrl(song.ItemId, 160);
+                        html += '<div style="text-align: center; cursor: pointer;" title="' + escapeHtml(song.Name) + ' — ' + escapeHtml(song.Artist || '') + ' (' + song.PlayCount + ')">';
+                        if (img) html += '<img src="' + img + '" style="width: 80px; height: 80px; border-radius: 4px; object-fit: cover;" onerror="this.src=\'\';this.style.background=\'#333\';this.style.borderRadius=\'4px\'" />';
+                        else html += '<div style="width: 80px; height: 80px; background: #333; border-radius: 4px;"></div>';
+                        html += '</div>';
+                    });
+                    container.innerHTML = html || '<div class="fieldDescription">Sin datos.</div>';
+                }
+            } catch (e) {}
+
+            // Discoveries (songs first seen in last month) — need new API endpoint
+            try {
+                const r = await apiGet('/Charts/Discoveries?months=1');
+                if (r.success && r.data && r.data.length > 0) {
+                    const container = document.getElementById('discoveriesContainer');
+                    let html = '';
+                    r.data.forEach(song => {
+                        const img = imageUrl(song.itemId, 160);
+                        html += '<div style="text-align: center; cursor: pointer;" title="' + escapeHtml(song.name) + ' — ' + escapeHtml(song.albumArtist || '') + '">';
+                        if (img) html += '<img src="' + img + '" style="width: 80px; height: 80px; border-radius: 4px; object-fit: cover;" onerror="this.style.background=\'#333\';this.style.borderRadius=\'4px\';this.removeAttribute(\'src\')" />';
+                        else html += '<div style="width: 80px; height: 80px; background: #333; border-radius: 4px;"></div>';
+                        html += '</div>';
+                    });
+                    container.innerHTML = html;
+                } else {
+                    document.getElementById('discoveriesContainer').innerHTML = '<div class="fieldDescription">Sin descubrimientos recientes.</div>';
+                }
+            } catch (e) {
+                document.getElementById('discoveriesContainer').innerHTML = '<div class="fieldDescription">Sin descubrimientos recientes.</div>';
+            }
+        }
+
+        // --- RECAP SUB-TAB ---
+        let quarterCompareChart = null, genreEvolutionChart = null;
+
+        async function loadRecap() {
+            loadChartJs(() => {
+                loadRecapCards();
+                loadQuarterCompare();
+                loadGenreEvolution();
+            });
+        }
+
+        async function loadRecapCards() {
+            const container = document.getElementById('recapCardsContainer');
+            try {
+                const r = await apiGet('/Charts/Recap');
+                if (!r.success) { container.innerHTML = '<div class="fieldDescription">Sin datos.</div>'; return; }
+                const d = r.data;
+                let html = '';
+                const cards = [
+                    { label: 'Género #1', value: d.topGenre || '—', icon: 'category', color: '#00a4dc' },
+                    { label: 'Artista #1', value: d.topArtist || '—', icon: 'person', color: '#00c8a0' },
+                    { label: 'Canción #1', value: d.topSong || '—', icon: 'music_note', color: '#f0c040' },
+                    { label: 'Reproducciones', value: d.totalPlays || 0, icon: 'play_circle', color: '#e04060' },
+                    { label: 'Horas escuchadas', value: formatDuration(d.totalDurationMs || 0), icon: 'schedule', color: '#a040c0' },
+                    { label: 'Canciones distintas', value: d.distinctSongs || 0, icon: 'library_music', color: '#4060e0' }
+                ];
+                cards.forEach(c => {
+                    html += '<div class="paperList" style="padding: 1.5em; text-align: center; min-width: 160px; flex: 1;">';
+                    html += '<span class="material-icons" style="font-size: 2em; color: ' + c.color + ';">' + c.icon + '</span>';
+                    html += '<div style="font-size: 1.3em; font-weight: 700; margin-top: 0.3em;">' + escapeHtml(String(c.value)) + '</div>';
+                    html += '<div class="fieldDescription">' + c.label + '</div>';
+                    html += '</div>';
+                });
+                container.innerHTML = html;
+            } catch (e) { container.innerHTML = '<div class="fieldDescription">Error.</div>'; }
+        }
+
+        async function loadQuarterCompare() {
+            try {
+                const r = await apiGet('/Charts/QuarterCompare');
+                if (!r.success || !r.data) return;
+                const ctx = document.getElementById('chartQuarterCompare');
+                if (!ctx) return;
+                if (quarterCompareChart) quarterCompareChart.destroy();
+                const genres = r.data.genres || [];
+                const current = r.data.current || [];
+                const previous = r.data.previous || [];
+                quarterCompareChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: genres,
+                        datasets: [
+                            { label: 'Trimestre anterior', data: previous, backgroundColor: 'rgba(100,100,100,0.7)' },
+                            { label: 'Trimestre actual', data: current, backgroundColor: 'rgba(0,164,220,0.8)' }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { labels: { color: '#ccc', font: { size: 14 } }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } } },
+                        scales: { x: { ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } }, y: { ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } } }
+                    }
+                });
+            } catch (e) {}
+        }
+
+        async function loadGenreEvolution() {
+            try {
+                const r = await apiGet('/Charts/GenreEvolution');
+                if (!r.success || !r.data) return;
+                const ctx = document.getElementById('chartGenreEvolution');
+                if (!ctx) return;
+                if (genreEvolutionChart) genreEvolutionChart.destroy();
+                const months = r.data.months || [];
+                const genres = r.data.genres || [];
+                const datasets = genres.map((g, i) => ({
+                    label: g,
+                    data: (r.data.series[g] || []).map(v => v),
+                    borderColor: 'hsl(' + (i * 72) + ',70%,55%)',
+                    backgroundColor: 'hsla(' + (i * 72) + ',70%,55%,0.1)',
+                    fill: false,
+                    tension: 0.3
+                }));
+                genreEvolutionChart = new Chart(ctx, {
+                    type: 'line',
+                    data: { labels: months, datasets },
+                    options: {
+                        responsive: true,
+                        plugins: { legend: { labels: { color: '#ccc', font: { size: 14 } }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } } },
+                        scales: { x: { ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } }, y: { ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } } }
+                    }
+                });
+            } catch (e) {}
         }
 
         async function loadStreak() {

@@ -368,6 +368,58 @@ public sealed class EstadisticasApiController : ControllerBase
         catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
     }
 
+    /// <summary>Recap data: top genre/artist/song + totals for current quarter.</summary>
+    [HttpGet("Charts/Recap")]
+    public ActionResult ChartsRecap()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _charts.GetRecap();
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Quarter comparison: top 10 genres, current vs previous quarter.</summary>
+    [HttpGet("Charts/QuarterCompare")]
+    public ActionResult ChartsQuarterCompare()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _charts.GetQuarterCompare();
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Genre evolution: top 5 genres, plays per month, last 12 months.</summary>
+    [HttpGet("Charts/GenreEvolution")]
+    public ActionResult ChartsGenreEvolution()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _charts.GetGenreEvolution();
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Discoveries: songs first seen in the last N months.</summary>
+    [HttpGet("Charts/Discoveries")]
+    public ActionResult ChartsDiscoveries([FromQuery] int months = 1)
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _charts.GetDiscoveries(months);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
     [HttpGet("Historical/Years")]
     public ActionResult GetHistoricalYears()
     {
