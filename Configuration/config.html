@@ -40,11 +40,11 @@
                     <div class="selectContainer" style="flex: 1; min-width: 10em;">
                         <label class="selectLabel" for="topWindow">Ventana temporal</label>
                         <select is="emby-select" id="topWindow" class="emby-select-withcolor emby-select">
-                            <option value="2w">Últimas 2 semanas</option>
+                            <option value="2w" selected>Últimas 2 semanas</option>
                             <option value="1m">Último mes</option>
                             <option value="3m">Últimos 3 meses</option>
                             <option value="6m">Últimos 6 meses</option>
-                            <option value="12m" selected>Últimos 12 meses</option>
+                            <option value="12m">Últimos 12 meses</option>
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
@@ -91,11 +91,11 @@
                     <div class="selectContainer" style="flex: 1; min-width: 10em;">
                         <label class="selectLabel" for="botWindow">Ventana temporal</label>
                         <select is="emby-select" id="botWindow" class="emby-select-withcolor emby-select">
-                            <option value="2w">Últimas 2 semanas</option>
+                            <option value="2w" selected>Últimas 2 semanas</option>
                             <option value="1m">Último mes</option>
                             <option value="3m">Últimos 3 meses</option>
                             <option value="6m">Últimos 6 meses</option>
-                            <option value="12m" selected>Últimos 12 meses</option>
+                            <option value="12m">Últimos 12 meses</option>
                             <option value="last_year">Año anterior</option>
                         </select>
                     </div>
@@ -836,8 +836,8 @@
                     const winCols = ['2w', '1m', '3m', '6m', '12m', 'last_year'];
                     const winLabels = { '2w': '2 semanas', '1m': '1 mes', '3m': '3 meses', '6m': '6 meses', '12m': '12 meses', 'last_year': 'Año anterior' };
 
-                    html += '<h3 style="margin-top: 1.5em;">Tiempo total escuchado (aproximado)</h3>';
-                    html += '<div class="fieldDescription" style="margin-bottom: 0.5em;">Suma la duración completa de cada canción reproducida en el periodo (no el tiempo real escuchado). Ordenado por total descendente.</div>';
+                    html += '<h3 style="margin-top: 1.5em;">Tiempo total escuchado</h3>';
+                    html += '<div class="fieldDescription" style="margin-bottom: 0.5em;">Suma la duración completa de cada canción reproducida en el periodo indicado. Ordenado por total descendente.</div>';
 
                     // Sort genres by all-time total (data[g]["total"]) descending
                     const genres = Object.keys(data);
@@ -850,23 +850,59 @@
                     if (genres.length === 0) {
                         html += '<div class="fieldDescription">Aún no hay datos suficientes para mostrar el tiempo total escuchado.</div>';
                     } else {
-                        html += '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;">';
-                        html += '<thead><tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Género</th>';
-                        winCols.forEach(w => {
-                            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">' + winLabels[w] + '</th>';
-                        });
-                        html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">Total</th>';
-                        html += '</tr></thead><tbody>';
-                        genres.forEach(g => {
-                            html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; font-weight: 600;">' + escapeHtml(g) + '</td>';
-                            winCols.forEach(w => {
-                                const ms = (data[g] && data[g][w]) || 0;
-                                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-size: 0.95em;">' + (ms > 0 ? formatDuration(ms) : '—') + '</td>';
+                        // Build a sortable table with # column
+                        // Store sort state in a closure so clicks can re-render
+                        const ltTableId = 'listeningTimeTable';
+                        const ltSortState = { key: 'total', dir: 'desc' };
+
+                        function renderListeningTimeTable(sortKey, sortDir) {
+                            // Sort genres by the selected column
+                            const sortedGenres = genres.slice().sort((a, b) => {
+                                let va, vb;
+                                if (sortKey === 'name') { va = a; vb = b; }
+                                else if (sortKey === 'total') { va = genreTotals[a] || 0; vb = genreTotals[b] || 0; }
+                                else { va = (data[a] && data[a][sortKey]) || 0; vb = (data[b] && data[b][sortKey]) || 0; }
+                                if (va < vb) return sortDir === 'desc' ? 1 : -1;
+                                if (va > vb) return sortDir === 'desc' ? -1 : 1;
+                                return 0;
                             });
-                            html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-weight: 600; color: #00a4dc; font-size: 0.95em;">' + formatDuration(genreTotals[g] || 0) + '</td>';
-                            html += '</tr>';
-                        });
-                        html += '</tbody></table></div>';
+
+                            let t = '<div style="overflow-x: auto;"><table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;">';
+                            t += '<thead><tr>';
+                            t += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 3em; color: #888; background: #1a1a1a;">#</th>';
+                            t += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a; cursor: pointer;" onclick="window.ltSort(\'name\')">Género</th>';
+                            winCols.forEach(w => {
+                                t += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a; cursor: pointer;" onclick="window.ltSort(\'' + w + '\')">' + winLabels[w] + '</th>';
+                            });
+                            t += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a; cursor: pointer;" onclick="window.ltSort(\'total\')">Total</th>';
+                            t += '</tr></thead><tbody>';
+                            sortedGenres.forEach((g, i) => {
+                                t += '<tr>';
+                                t += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; color: #888;">' + (i + 1) + '</td>';
+                                t += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; font-weight: 600;">' + escapeHtml(g) + '</td>';
+                                winCols.forEach(w => {
+                                    const ms = (data[g] && data[g][w]) || 0;
+                                    t += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-size: 0.95em;">' + (ms > 0 ? formatDuration(ms) : '—') + '</td>';
+                                });
+                                t += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-weight: 600; color: #00a4dc; font-size: 0.95em;">' + formatDuration(genreTotals[g] || 0) + '</td>';
+                                t += '</tr>';
+                            });
+                            t += '</tbody></table></div>';
+                            return t;
+                        }
+
+                        window.ltSort = function(key) {
+                            if (ltSortState.key === key) {
+                                ltSortState.dir = ltSortState.dir === 'desc' ? 'asc' : 'desc';
+                            } else {
+                                ltSortState.key = key;
+                                ltSortState.dir = 'desc';
+                            }
+                            const el = document.getElementById(ltTableId);
+                            if (el) el.innerHTML = renderListeningTimeTable(ltSortState.key, ltSortState.dir);
+                        };
+
+                        html += '<div id="' + ltTableId + '">' + renderListeningTimeTable(ltSortState.key, ltSortState.dir) + '</div>';
                     }
                 }
             } catch (e) {
@@ -944,27 +980,32 @@
             html += '<tr><th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Tiempo total escuchado (aprox.)</th><td style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a;">' + formatDuration(d.totalDurationMs || 0) + '</td></tr>';
             html += '</tbody></table>';
 
-            // Top 25 songs
+            // Top 25 songs — with genre column
             html += '<h3 style="margin-top: 1.5em;">Top 25 canciones</h3>';
-            html += renderHistoricalTable(d.topSongs, ['name', 'albumArtist', 'albumName', 'playCount'], ['Canción', 'Artista', 'Álbum', 'Reproducciones']);
+            html += renderHistoricalTable(d.topSongs, ['name', 'albumArtist', 'albumName', 'genre', 'playCount'], ['Canción', 'Artista', 'Álbum', 'Género', 'Reproducciones']);
 
-            // Top 25 artists
-            html += '<h3 style="margin-top: 1.5em;">Top 25 artistas</h3>';
+            // Top 25 artists and Top 25 genres side by side
+            html += '<div style="display: flex; gap: 2em; margin-top: 1.5em; flex-wrap: wrap;">';
+            html += '<div style="flex: 1; min-width: 20em;">';
+            html += '<h3 style="margin-top: 0;">Top 25 artistas</h3>';
             html += renderHistoricalTable(d.topArtists, ['name', 'playCount'], ['Artista', 'Reproducciones']);
-
-            // Top 25 genres
-            html += '<h3 style="margin-top: 1.5em;">Top 25 géneros</h3>';
+            html += '</div>';
+            html += '<div style="flex: 1; min-width: 20em;">';
+            html += '<h3 style="margin-top: 0;">Top 25 géneros</h3>';
             html += renderHistoricalTable(d.topGenres, ['name', 'playCount'], ['Género', 'Reproducciones']);
+            html += '</div>';
+            html += '</div>';
 
-            // Top 25 albums
+            // Top 25 albums — with genre column
             html += '<h3 style="margin-top: 1.5em;">Top 25 álbumes</h3>';
-            html += renderHistoricalTable(d.topAlbums, ['albumName', 'albumArtist', 'playCount'], ['Álbum', 'Artista', 'Reproducciones']);
+            html += renderHistoricalTable(d.topAlbums, ['albumName', 'albumArtist', 'genre', 'playCount'], ['Álbum', 'Artista', 'Género', 'Reproducciones']);
 
             document.getElementById('histResults').innerHTML = html;
         }
         function renderHistoricalTable(rows, fields, headers) {
             if (!rows || rows.length === 0) return '<div class="fieldDescription">Sin datos.</div>';
             let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;"><thead><tr>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 3em; color: #888; background: #1a1a1a;">#</th>';
             headers.forEach((h, idx) => {
                 const isPlays = fields[idx] === 'playCount';
                 const align = isPlays ? 'right' : 'left';
@@ -973,6 +1014,7 @@
             html += '</tr></thead><tbody>';
             rows.forEach((r, i) => {
                 html += '<tr>';
+                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; color: #888;">' + (i + 1) + '</td>';
                 fields.forEach((f, idx) => {
                     const val = r[f];
                     const isPlays = f === 'playCount';
@@ -1011,23 +1053,44 @@
                 return;
             }
             let html = '<h3 style="margin-top: 0.5em;">Comparativa de años</h3>';
+            html += '<div class="fieldDescription" style="margin-bottom: 0.5em;">Top 5 de cada categoría por año. La primera fila de cada año muestra los totales.</div>';
             html += '<table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;"><thead><tr>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 3em; color: #888; background: #1a1a1a;">#</th>';
             html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Año</th>';
             html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">Reproducciones</th>';
-            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top género</th>';
-            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top artista</th>';
-            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top canción</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top géneros</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top artistas</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top canciones</th>';
+            html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">Top álbumes</th>';
             html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; background: #1a1a1a;">Tiempo total</th>';
             html += '</tr></thead><tbody>';
             rows.forEach(r => {
-                html += '<tr>';
-                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; font-weight: 600;">' + r.year + '</td>';
-                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + (r.totalPlays || 0) + '</td>';
-                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.topGenre || '—') + '</td>';
-                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.topArtist || '—') + '</td>';
-                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.topSong || '—') + '</td>';
-                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + formatDuration(r.totalDurationMs || 0) + '</td>';
-                html += '</tr>';
+                const g5 = r.top5Genres || [];
+                const a5 = r.top5Artists || [];
+                const s5 = r.top5Songs || [];
+                const al5 = r.top5Albums || [];
+                const maxRows = Math.max(g5.length, a5.length, s5.length, al5.length, 1);
+                for (let i = 0; i < maxRows; i++) {
+                    html += '<tr>';
+                    html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; color: #888;">' + (i + 1) + '</td>';
+                    if (i === 0) {
+                        html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; font-weight: 600;">' + r.year + '</td>';
+                        html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + (r.totalPlays || 0) + '</td>';
+                    } else {
+                        html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;"></td>';
+                        html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;"></td>';
+                    }
+                    html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (g5[i] ? escapeHtml(g5[i].name) + ' (' + g5[i].plays + ')' : '') + '</td>';
+                    html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (a5[i] ? escapeHtml(a5[i].name) + ' (' + a5[i].plays + ')' : '') + '</td>';
+                    html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (s5[i] ? escapeHtml(s5[i].name) + ' (' + s5[i].plays + ')' : '') + '</td>';
+                    html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + (al5[i] ? escapeHtml(al5[i].name) + (al5[i].artist ? ' — ' + escapeHtml(al5[i].artist) : '') + ' (' + al5[i].plays + ')' : '') + '</td>';
+                    if (i === 0) {
+                        html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + formatDuration(r.totalDurationMs || 0) + '</td>';
+                    } else {
+                        html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;"></td>';
+                    }
+                    html += '</tr>';
+                }
             });
             html += '</tbody></table>';
             document.getElementById('histResults').innerHTML = html;

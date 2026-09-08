@@ -526,12 +526,16 @@ public sealed class StatisticsService
                COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1)) AS artist,
                t.album_name AS album,
                COUNT(p.id) AS period_plays,
-               (SELECT COUNT(*) FROM plays p2 JOIN tracks t2 ON t2.item_id = p2.item_id WHERE t2.album_name IS t.album_name AND t2.album_artist IS t.album_artist) AS total_plays
+               (SELECT COUNT(*) FROM plays p2 JOIN tracks t2 ON t2.item_id = p2.item_id
+                WHERE t2.album_name IS t.album_name
+                  AND COALESCE(t2.album_artist, (SELECT ta3.artist FROM track_artists ta3 WHERE ta3.item_id = t2.item_id LIMIT 1))
+                    IS COALESCE(t.album_artist, (SELECT ta4.artist FROM track_artists ta4 WHERE ta4.item_id = t.item_id LIMIT 1))) AS total_plays
         FROM plays p
         JOIN tracks t ON t.item_id = p.item_id
         WHERE p.played_at >= @start AND p.played_at < @end
           AND t.album_name IS NOT NULL{yearClause}
-        GROUP BY t.album_name, t.album_artist
+        GROUP BY t.album_name,
+                 COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1))
         ORDER BY period_plays {dir}, t.album_name ASC
         LIMIT @limit;";
 
@@ -541,11 +545,15 @@ public sealed class StatisticsService
                COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1)) AS artist,
                t.album_name AS album,
                COUNT(p.id) AS period_plays,
-               (SELECT COUNT(*) FROM plays p2 JOIN tracks t2 ON t2.item_id = p2.item_id WHERE t2.album_name IS t.album_name AND t2.album_artist IS t.album_artist) AS total_plays
+               (SELECT COUNT(*) FROM plays p2 JOIN tracks t2 ON t2.item_id = p2.item_id
+                WHERE t2.album_name IS t.album_name
+                  AND COALESCE(t2.album_artist, (SELECT ta3.artist FROM track_artists ta3 WHERE ta3.item_id = t2.item_id LIMIT 1))
+                    IS COALESCE(t.album_artist, (SELECT ta4.artist FROM track_artists ta4 WHERE ta4.item_id = t.item_id LIMIT 1))) AS total_plays
         FROM tracks t
         LEFT JOIN plays p ON p.item_id = t.item_id AND p.played_at >= @start AND p.played_at < @end
         WHERE t.album_name IS NOT NULL{yearClause}
-        GROUP BY t.album_name, t.album_artist
+        GROUP BY t.album_name,
+                 COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1))
         ORDER BY period_plays {dir}, total_plays ASC, MIN(t.first_seen) ASC, t.album_name ASC
         LIMIT @limit;";
 

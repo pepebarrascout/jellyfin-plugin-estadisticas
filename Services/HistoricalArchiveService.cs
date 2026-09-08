@@ -244,7 +244,7 @@ public sealed class HistoricalArchiveService
         var result = new Dictionary<string, object>();
         using var conn = _db.OpenHistorical();
 
-        // Top 25 songs
+        // Top 25 songs — with genre from main DB
         var topSongs = new List<Dictionary<string, object>>();
         using (var cmd = conn.CreateCommand())
         {
@@ -260,7 +260,8 @@ public sealed class HistoricalArchiveService
                     ["albumArtist"] = r.IsDBNull(2) ? null : r.GetString(2),
                     ["albumName"] = r.IsDBNull(3) ? null : r.GetString(3),
                     ["playCount"] = r.GetInt64(4),
-                    ["durationMs"] = r.GetInt64(5)
+                    ["durationMs"] = r.GetInt64(5),
+                    ["genre"] = GetGenresForItem(r.GetString(0))
                 });
             }
         }
@@ -315,7 +316,8 @@ public sealed class HistoricalArchiveService
                 {
                     ["albumArtist"] = r.IsDBNull(0) ? null : r.GetString(0),
                     ["albumName"] = r.GetString(1),
-                    ["playCount"] = r.GetInt64(2)
+                    ["playCount"] = r.GetInt64(2),
+                    ["genre"] = GetGenresForAlbum(r.IsDBNull(0) ? null : r.GetString(0), r.GetString(1))
                 });
             }
         }
@@ -359,47 +361,66 @@ public sealed class HistoricalArchiveService
                 row["totalPlays"] = (long)cmd.ExecuteScalar();
             }
 
-            // Top genre
+            // Top 5 genres
+            var top5Genres = new List<Dictionary<string, object>>();
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT genre, play_count FROM yearly_genres WHERE year = @y ORDER BY play_count DESC LIMIT 1;";
+                cmd.CommandText = "SELECT genre, play_count FROM yearly_genres WHERE year = @y ORDER BY play_count DESC LIMIT 5;";
                 cmd.Parameters.AddWithValue("@y", year);
                 using var r = cmd.ExecuteReader();
-                if (r.Read())
+                while (r.Read())
                 {
-                    row["topGenre"] = r.GetString(0);
-                    row["topGenrePlays"] = r.GetInt64(1);
+                    top5Genres.Add(new Dictionary<string, object> { ["name"] = r.GetString(0), ["plays"] = r.GetInt64(1) });
                 }
-                else { row["topGenre"] = null; row["topGenrePlays"] = 0L; }
             }
+            row["top5Genres"] = top5Genres;
 
-            // Top artist
+            // Top 5 artists
+            var top5Artists = new List<Dictionary<string, object>>();
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT artist, play_count FROM yearly_artists WHERE year = @y ORDER BY play_count DESC LIMIT 1;";
+                cmd.CommandText = "SELECT artist, play_count FROM yearly_artists WHERE year = @y ORDER BY play_count DESC LIMIT 5;";
                 cmd.Parameters.AddWithValue("@y", year);
                 using var r = cmd.ExecuteReader();
-                if (r.Read())
+                while (r.Read())
                 {
-                    row["topArtist"] = r.GetString(0);
-                    row["topArtistPlays"] = r.GetInt64(1);
+                    top5Artists.Add(new Dictionary<string, object> { ["name"] = r.GetString(0), ["plays"] = r.GetInt64(1) });
                 }
-                else { row["topArtist"] = null; row["topArtistPlays"] = 0L; }
             }
+            row["top5Artists"] = top5Artists;
 
-            // Top song
+            // Top 5 songs
+            var top5Songs = new List<Dictionary<string, object>>();
             using (var cmd = conn.CreateCommand())
             {
-                cmd.CommandText = "SELECT name, play_count FROM yearly_songs WHERE year = @y ORDER BY play_count DESC LIMIT 1;";
+                cmd.CommandText = "SELECT name, play_count FROM yearly_songs WHERE year = @y ORDER BY play_count DESC LIMIT 5;";
                 cmd.Parameters.AddWithValue("@y", year);
                 using var r = cmd.ExecuteReader();
-                if (r.Read())
+                while (r.Read())
                 {
-                    row["topSong"] = r.GetString(0);
-                    row["topSongPlays"] = r.GetInt64(1);
+                    top5Songs.Add(new Dictionary<string, object> { ["name"] = r.GetString(0), ["plays"] = r.GetInt64(1) });
                 }
-                else { row["topSong"] = null; row["topSongPlays"] = 0L; }
             }
+            row["top5Songs"] = top5Songs;
+
+            // Top 5 albums
+            var top5Albums = new List<Dictionary<string, object>>();
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = "SELECT album_name, album_artist, play_count FROM yearly_albums WHERE year = @y ORDER BY play_count DESC LIMIT 5;";
+                cmd.Parameters.AddWithValue("@y", year);
+                using var r = cmd.ExecuteReader();
+                while (r.Read())
+                {
+                    top5Albums.Add(new Dictionary<string, object>
+                    {
+                        ["name"] = r.IsDBNull(0) ? "(Sin álbum)" : r.GetString(0),
+                        ["artist"] = r.IsDBNull(1) ? null : r.GetString(1),
+                        ["plays"] = r.GetInt64(2)
+                    });
+                }
+            }
+            row["top5Albums"] = top5Albums;
 
             // Total duration
             using (var cmd = conn.CreateCommand())
@@ -413,5 +434,66 @@ public sealed class HistoricalArchiveService
         }
 
         return result;
+    }
+
+    /// <summary>
+    /// Gets genres for a specific item (song) from the main DB.
+    /// Returns a comma-separated string, or null if no genres.
+    /// </summary>
+    private string? GetGenresForItem(string itemId)
+    {
+        try
+        {
+            using var conn = _db.OpenMain();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT genre FROM track_genres WHERE item_id = @id;";
+            cmd.Parameters.AddWithValue("@id", itemId);
+            using var reader = cmd.ExecuteReader();
+            var genres = new List<string>();
+            while (reader.Read())
+            {
+                if (!reader.IsDBNull(0)) genres.Add(reader.GetString(0));
+            }
+            return genres.Count > 0 ? string.Join(", ", genres) : null;
+        }
+        catch { return null; }
+    }
+
+    /// <summary>
+    /// Gets genres for an album (from any song in that album) from the main DB.
+    /// Returns a comma-separated string, or null if no genres.
+    /// </summary>
+    private string? GetGenresForAlbum(string? albumArtist, string albumName)
+    {
+        try
+        {
+            using var conn = _db.OpenMain();
+            using var cmd = conn.CreateCommand();
+            if (albumArtist != null)
+            {
+                cmd.CommandText = @"
+                    SELECT DISTINCT tg.genre FROM track_genres tg
+                    JOIN tracks t ON t.item_id = tg.item_id
+                    WHERE t.album_name = @an AND t.album_artist = @aa;";
+                cmd.Parameters.AddWithValue("@an", albumName);
+                cmd.Parameters.AddWithValue("@aa", albumArtist);
+            }
+            else
+            {
+                cmd.CommandText = @"
+                    SELECT DISTINCT tg.genre FROM track_genres tg
+                    JOIN tracks t ON t.item_id = tg.item_id
+                    WHERE t.album_name = @an;";
+                cmd.Parameters.AddWithValue("@an", albumName);
+            }
+            using var reader = cmd.ExecuteReader();
+            var genres = new List<string>();
+            while (reader.Read())
+            {
+                if (!reader.IsDBNull(0)) genres.Add(reader.GetString(0));
+            }
+            return genres.Count > 0 ? string.Join(", ", genres) : null;
+        }
+        catch { return null; }
     }
 }
