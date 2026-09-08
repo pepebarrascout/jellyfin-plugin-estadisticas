@@ -18,6 +18,7 @@
                 <a class="emby-button" href="#" data-role="button" data-tab="resumen">Resumen</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="historico">Histórico</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="logros">Logros</a>
+                <a class="emby-button" href="#" data-role="button" data-tab="graficos">Gráficos</a>
             </div>
 
             <!-- ====== TOP 50 TAB ====== -->
@@ -290,6 +291,85 @@
                 <div id="achievementsResults"></div>
             </div>
 
+            <!-- ====== GRÁFICOS TAB ====== -->
+            <div id="tab-graficos" class="page-content hide">
+                <h2>Gráficos</h2>
+
+                <!-- Sub-tab navigation -->
+                <div data-role="controlgroup" data-type="horizontal" class="localnav" style="margin-bottom: 1.5em;">
+                    <a class="emby-button graficoSubTab active" href="#" data-role="button" data-subtab="estadisticas">Estadísticas</a>
+                    <a class="emby-button graficoSubTab" href="#" data-role="button" data-subtab="portadas">Portadas</a>
+                    <a class="emby-button graficoSubTab" href="#" data-role="button" data-subtab="recap">Recap</a>
+                    <a class="emby-button graficoSubTab" href="#" data-role="button" data-subtab="gamificacion">Gamificación</a>
+                </div>
+
+                <!-- Sub-tab: Estadísticas (6 charts) -->
+                <div id="subtab-estadisticas" class="graficoSubPanel">
+                    <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
+                        <div class="selectContainer" style="flex: 0.5; min-width: 10em;">
+                            <label class="selectLabel" for="chartWindow">Ventana temporal</label>
+                            <select is="emby-select" id="chartWindow" class="emby-select-withcolor emby-select">
+                                <option value="2w">Últimas 2 semanas</option>
+                                <option value="1m">Último mes</option>
+                                <option value="3m">Últimos 3 meses</option>
+                                <option value="6m">Últimos 6 meses</option>
+                                <option value="12m" selected>Últimos 12 meses</option>
+                                <option value="last_year">Año anterior</option>
+                            </select>
+                        </div>
+                        <button is="emby-button" type="button" class="raised button-submit" id="chartsRefresh">Actualizar gráficos</button>
+                    </div>
+
+                    <h3>Línea de tiempo de reproducciones</h3>
+                    <div style="background: #1a1a1a; border-radius: 6px; padding: 1em; margin-bottom: 1.5em;">
+                        <canvas id="chartTimeline" height="80"></canvas>
+                    </div>
+
+                    <h3>Heatmap de actividad</h3>
+                    <div id="chartHeatmapContainer" style="background: #1a1a1a; border-radius: 6px; padding: 1em; margin-bottom: 1.5em; overflow-x: auto;"></div>
+
+                    <div style="display: flex; gap: 2em; flex-wrap: wrap; margin-bottom: 1.5em;">
+                        <div style="flex: 1; min-width: 20em;">
+                            <h3>Reproducciones por hora del día</h3>
+                            <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
+                                <canvas id="chartByHour" height="120"></canvas>
+                            </div>
+                        </div>
+                        <div style="flex: 1; min-width: 20em;">
+                            <h3>Reproducciones por día de la semana</h3>
+                            <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
+                                <canvas id="chartByDay" height="120"></canvas>
+                            </div>
+                        </div>
+                    </div>
+
+                    <h3>Treemap de géneros</h3>
+                    <div id="chartTreemapContainer" style="background: #1a1a1a; border-radius: 6px; padding: 1em; margin-bottom: 1.5em;"></div>
+
+                    <h3>Artistas por popularidad vs. diversidad</h3>
+                    <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
+                        <canvas id="chartBubbles" height="100"></canvas>
+                    </div>
+                </div>
+
+                <!-- Sub-tab: Portadas (placeholder) -->
+                <div id="subtab-portadas" class="graficoSubPanel" style="display: none;">
+                    <div class="fieldDescription">Collages de portadas, álbum/artista del mes, y descubrimientos recientes. Disponible en v0.0.0.14.</div>
+                </div>
+
+                <!-- Sub-tab: Recap (placeholder) -->
+                <div id="subtab-recap" class="graficoSubPanel" style="display: none;">
+                    <div class="fieldDescription">Recap anual estilo Spotify Wrapped. Disponible en v0.0.0.14.</div>
+                </div>
+
+                <!-- Sub-tab: Gamificación (streak + badges) -->
+                <div id="subtab-gamificacion" class="graficoSubPanel" style="display: none;">
+                    <h3>Racha de días consecutivos</h3>
+                    <div id="streakContainer" style="background: #1a1a1a; border-radius: 6px; padding: 1.5em; margin-bottom: 1.5em; text-align: center;"></div>
+                    <div class="fieldDescription">Las insignias y niveles se encuentran en la pestaña "Logros".</div>
+                </div>
+            </div>
+
         </div>
     </div>
 
@@ -511,6 +591,7 @@
             if (tabName === 'resumen') loadDebugStatus();
             if (tabName === 'historico') loadHistoricalYears();
             if (tabName === 'logros') loadAchievements();
+            if (tabName === 'graficos') loadCharts();
         }
         page.querySelectorAll('[data-tab]').forEach(btn => {
             btn.addEventListener('click', (e) => {
@@ -1159,6 +1240,238 @@
             el.innerHTML = html;
         }
         document.getElementById('achievementsRefresh').addEventListener('click', loadAchievements);
+
+        // --- GRÁFICOS TAB (v0.0.0.13) ---
+        let chartJsLoaded = false;
+        let timelineChart = null, byHourChart = null, byDayChart = null, bubblesChart = null;
+
+        function loadChartJs(callback) {
+            if (chartJsLoaded) { callback(); return; }
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js';
+            script.onload = () => { chartJsLoaded = true; callback(); };
+            script.onerror = () => { showStatus('No se pudo cargar Chart.js. Verifica tu conexión a internet.', 'err'); };
+            document.head.appendChild(script);
+        }
+
+        // Sub-tab switching within Gráficos
+        page.querySelectorAll('.graficoSubTab').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.preventDefault();
+                page.querySelectorAll('.graficoSubTab').forEach(b => b.classList.remove('active', 'button-submit'));
+                btn.classList.add('active', 'button-submit');
+                page.querySelectorAll('.graficoSubPanel').forEach(p => p.style.display = 'none');
+                const sub = btn.getAttribute('data-subtab');
+                document.getElementById('subtab-' + sub).style.display = '';
+                if (sub === 'estadisticas') loadCharts();
+                if (sub === 'gamificacion') loadStreak();
+            });
+        });
+
+        async function loadCharts() {
+            const win = document.getElementById('chartWindow').value;
+            loadChartJs(() => renderAllCharts(win));
+        }
+        document.getElementById('chartsRefresh').addEventListener('click', loadCharts);
+        document.getElementById('chartWindow').addEventListener('change', loadCharts);
+
+        async function renderAllCharts(win) {
+            // Timeline
+            try {
+                const r1 = await apiGet('/Charts/Timeline?window=' + win);
+                if (r1.success) renderTimeline(r1.data);
+            } catch (e) {}
+
+            // Heatmap (always 12 months)
+            try {
+                const r2 = await apiGet('/Charts/Heatmap?months=12');
+                if (r2.success) renderHeatmap(r2.data);
+            } catch (e) {}
+
+            // By hour
+            try {
+                const r3 = await apiGet('/Charts/ByHour?window=' + win);
+                if (r3.success) renderByHour(r3.data);
+            } catch (e) {}
+
+            // By day of week
+            try {
+                const r4 = await apiGet('/Charts/ByDayOfWeek?window=' + win);
+                if (r4.success) renderByDay(r4.data);
+            } catch (e) {}
+
+            // Genre treemap
+            try {
+                const r5 = await apiGet('/Charts/GenreTreemap?window=' + win);
+                if (r5.success) renderTreemap(r5.data);
+            } catch (e) {}
+
+            // Artist bubbles
+            try {
+                const r6 = await apiGet('/Charts/ArtistBubbles?window=' + win);
+                if (r6.success) renderBubbles(r6.data);
+            } catch (e) {}
+        }
+
+        function renderTimeline(data) {
+            const ctx = document.getElementById('chartTimeline');
+            if (!ctx) return;
+            if (timelineChart) timelineChart.destroy();
+            const labels = data.map(d => d.date);
+            const counts = data.map(d => d.count);
+            timelineChart = new Chart(ctx, {
+                type: 'line',
+                data: { labels, datasets: [{ label: 'Reproducciones por día', data: counts, borderColor: '#00a4dc', backgroundColor: 'rgba(0,164,220,0.1)', fill: true, tension: 0.3 }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { x: { ticks: { color: '#888', maxTicksLimit: 12 } }, y: { ticks: { color: '#888' }, beginAtZero: true } } }
+            });
+        }
+
+        function renderHeatmap(data) {
+            const container = document.getElementById('chartHeatmapContainer');
+            if (!container) return;
+            // Build a map: date -> count
+            const map = {};
+            data.forEach(d => { map[d.date] = d.count; });
+            // Build grid: weeks as columns, days as rows (Mon-Sun)
+            const today = new Date();
+            const startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - 364); // ~52 weeks back
+            // Align to Monday
+            const dayOfWeek = (startDate.getDay() + 6) % 7;
+            startDate.setDate(startDate.getDate() - dayOfWeek);
+
+            const dayLabels = ['Lun', '', 'Mié', '', 'Vie', '', 'Dom'];
+            const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+            const colors = ['#1a1a1a', '#0d4429', '#0a7d3e', '#11b849', '#22cc55', '#44ee66', '#66ff77'];
+
+            let html = '<div style="display: inline-block;">';
+            // Month labels
+            html += '<div style="display: flex; margin-left: 2em;">';
+            let lastMonth = -1;
+            for (let w = 0; w < 53; w++) {
+                const d = new Date(startDate);
+                d.setDate(d.getDate() + w * 7);
+                const m = d.getMonth();
+                if (m !== lastMonth) {
+                    html += '<div style="width: 13px; font-size: 0.7em; color: #888; margin-right: 1px;">' + monthLabels[m] + '</div>';
+                    lastMonth = m;
+                } else {
+                    html += '<div style="width: 13px; margin-right: 1px;"></div>';
+                }
+            }
+            html += '</div>';
+            // Grid
+            html += '<div style="display: flex;">';
+            // Day labels
+            html += '<div style="display: flex; flex-direction: column; margin-right: 0.3em;">';
+            dayLabels.forEach(l => { html += '<div style="height: 13px; width: 2em; font-size: 0.7em; color: #888; line-height: 13px;">' + l + '</div>'; });
+            html += '</div>';
+            // Weeks
+            for (let w = 0; w < 53; w++) {
+                html += '<div style="display: flex; flex-direction: column;">';
+                for (let d = 0; d < 7; d++) {
+                    const cellDate = new Date(startDate);
+                    cellDate.setDate(cellDate.getDate() + w * 7 + d);
+                    if (cellDate > today) {
+                        html += '<div style="width: 13px; height: 13px; margin: 1px; background: transparent;"></div>';
+                    } else {
+                        const dateStr = cellDate.toISOString().substring(0, 10);
+                        const count = map[dateStr] || 0;
+                        const colorIdx = count === 0 ? 0 : Math.min(6, Math.ceil(count / 5));
+                        const bg = colors[colorIdx];
+                        html += '<div style="width: 13px; height: 13px; margin: 1px; background: ' + bg + '; border-radius: 2px;" title="' + dateStr + ': ' + count + ' plays"></div>';
+                    }
+                }
+                html += '</div>';
+            }
+            html += '</div></div>';
+            // Legend
+            html += '<div style="margin-top: 0.5em; display: flex; align-items: center; gap: 0.3em; font-size: 0.8em; color: #888;">Menos';
+            colors.forEach(c => { html += '<div style="width: 13px; height: 13px; background: ' + c + '; border-radius: 2px;"></div>'; });
+            html += 'Más</div>';
+            container.innerHTML = html;
+        }
+
+        function renderByHour(data) {
+            const ctx = document.getElementById('chartByHour');
+            if (!ctx) return;
+            if (byHourChart) byHourChart.destroy();
+            byHourChart = new Chart(ctx, {
+                type: 'polarArea',
+                data: { labels: data.map(d => d.hour + ':00'), datasets: [{ data: data.map(d => d.count), backgroundColor: data.map((d, i) => 'hsla(' + (i * 15) + ',70%,50%,0.7)') }] },
+                options: { responsive: true, plugins: { legend: { display: false } }, scales: { r: { ticks: { color: '#888' }, grid: { color: '#333' } } } }
+            });
+        }
+
+        function renderByDay(data) {
+            const ctx = document.getElementById('chartByDay');
+            if (!ctx) return;
+            if (byDayChart) byDayChart.destroy();
+            byDayChart = new Chart(ctx, {
+                type: 'polarArea',
+                data: { labels: data.map(d => d.dayName), datasets: [{ data: data.map(d => d.count), backgroundColor: ['rgba(0,164,220,0.7)', 'rgba(0,200,180,0.7)', 'rgba(0,220,140,0.7)', 'rgba(100,220,80,0.7)', 'rgba(200,200,40,0.7)', 'rgba(240,160,20,0.7)', 'rgba(240,80,40,0.7)'] }] },
+                options: { responsive: true, plugins: { legend: { position: 'bottom', labels: { color: '#ccc' } } }, scales: { r: { ticks: { color: '#888' }, grid: { color: '#333' } } } }
+            });
+        }
+
+        function renderTreemap(data) {
+            const container = document.getElementById('chartTreemapContainer');
+            if (!container) return;
+            if (!data || data.length === 0) { container.innerHTML = '<div class="fieldDescription">Sin datos.</div>'; return; }
+            const total = data.reduce((s, d) => s + d.plays, 0);
+            const colors = ['#00a4dc', '#00c8a0', '#7bc840', '#f0c040', '#f08040', '#e04060', '#a040c0', '#4060e0', '#40c0e0', '#80c080', '#666'];
+            let html = '<div style="display: flex; flex-wrap: wrap; gap: 2px; height: 200px;">';
+            data.forEach((d, i) => {
+                const pct = (d.plays / total * 100);
+                const flex = Math.max(1, pct / 2);
+                const color = colors[i % colors.length];
+                html += '<div style="flex: ' + flex + '; background: ' + color + '; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.3em; min-width: 60px; cursor: pointer;" title="' + escapeHtml(d.name) + ': ' + d.plays + ' plays (' + pct.toFixed(1) + '%)">';
+                html += '<span style="font-size: 0.85em; font-weight: 600; color: #fff; text-align: center;">' + escapeHtml(d.name) + '</span>';
+                html += '<span style="font-size: 0.75em; color: rgba(255,255,255,0.8);">' + pct.toFixed(0) + '%</span>';
+                html += '</div>';
+            });
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        function renderBubbles(data) {
+            const ctx = document.getElementById('chartBubbles');
+            if (!ctx) return;
+            if (bubblesChart) bubblesChart.destroy();
+            if (!data || data.length === 0) return;
+            const maxDur = Math.max(...data.map(d => d.durationMs || 1));
+            bubblesChart = new Chart(ctx, {
+                type: 'bubble',
+                data: { datasets: [{ label: 'Artistas', data: data.map(d => ({ x: d.totalPlays, y: d.distinctSongs, r: Math.max(5, Math.sqrt((d.durationMs || 0) / maxDur) * 30) })), backgroundColor: 'rgba(0,164,220,0.6)', borderColor: '#00a4dc' }] },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { callbacks: { label: (ctx) => {
+                            const d = data[ctx.dataIndex];
+                            return d.artist + ': ' + d.totalPlays + ' plays, ' + d.distinctSongs + ' canciones, ' + formatDuration(d.durationMs || 0);
+                        } } }
+                    },
+                    scales: { x: { title: { display: true, text: 'Reproducciones totales', color: '#ccc' }, ticks: { color: '#888' }, grid: { color: '#333' } }, y: { title: { display: true, text: 'Canciones distintas', color: '#ccc' }, ticks: { color: '#888' }, grid: { color: '#333' } } }
+                }
+            });
+        }
+
+        async function loadStreak() {
+            const container = document.getElementById('streakContainer');
+            if (!container) return;
+            container.innerHTML = '<div class="fieldDescription">Cargando racha...</div>';
+            const r = await apiGet('/Charts/Streak');
+            if (!r || !r.success) { container.innerHTML = '<div class="fieldDescription">Error.</div>'; return; }
+            const d = r.data;
+            const current = d.currentStreak || 0;
+            const longest = d.longestStreak || 0;
+            let html = '<div style="font-size: 3em; font-weight: 700; color: #00a4dc;">' + current + '</div>';
+            html += '<div style="font-size: 1.2em; color: #ccc;">días consecutivos</div>';
+            html += '<div class="fieldDescription" style="margin-top: 0.5em;">Racha más larga: ' + longest + ' días</div>';
+            if (d.lastPlayDate) html += '<div class="fieldDescription">Última reproducción: ' + formatDate(d.lastPlayDate) + '</div>';
+            container.innerHTML = html;
+        }
 
         // Initial load: pre-fill top results
         runTop();

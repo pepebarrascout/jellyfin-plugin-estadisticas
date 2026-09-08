@@ -29,6 +29,7 @@ public sealed class EstadisticasApiController : ControllerBase
     private readonly DebugService _debug;
     private readonly AchievementService _achievements;
     private readonly HistoricalArchiveService _historical;
+    private readonly ChartService _charts;
 
     public EstadisticasApiController(
         ILogger<EstadisticasApiController> logger,
@@ -38,7 +39,8 @@ public sealed class EstadisticasApiController : ControllerBase
         PlaylistPublisherService publisher,
         DebugService debug,
         AchievementService achievements,
-        HistoricalArchiveService historical)
+        HistoricalArchiveService historical,
+        ChartService charts)
     {
         _logger = logger;
         _db = db;
@@ -48,6 +50,7 @@ public sealed class EstadisticasApiController : ControllerBase
         _debug = debug;
         _achievements = achievements;
         _historical = historical;
+        _charts = charts;
     }
 
     /// <summary>
@@ -265,6 +268,106 @@ public sealed class EstadisticasApiController : ControllerBase
     /// <summary>
     /// Returns the list of years available in the historical DB (v0.0.0.9).
     /// </summary>
+    [HttpGet("Historical/Years")]
+
+    // ====== CHARTS ENDPOINTS (v0.0.0.13) ======
+
+    /// <summary>Plays per day for timeline chart.</summary>
+    [HttpGet("Charts/Timeline")]
+    public ActionResult ChartsTimeline([FromQuery] string window = "12m")
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetTimeline(win);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Plays per day for heatmap (last N months).</summary>
+    [HttpGet("Charts/Heatmap")]
+    public ActionResult ChartsHeatmap([FromQuery] int months = 12)
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _charts.GetHeatmap(months);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Plays by hour of day (0-23).</summary>
+    [HttpGet("Charts/ByHour")]
+    public ActionResult ChartsByHour([FromQuery] string window = "12m")
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetByHour(win);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Plays by day of week (0=Mon..6=Sun).</summary>
+    [HttpGet("Charts/ByDayOfWeek")]
+    public ActionResult ChartsByDayOfWeek([FromQuery] string window = "12m")
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetByDayOfWeek(win);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Top 10 genres + Others for treemap.</summary>
+    [HttpGet("Charts/GenreTreemap")]
+    public ActionResult ChartsGenreTreemap([FromQuery] string window = "12m")
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetGenreTreemap(win);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Artist bubbles: plays vs distinct songs vs duration.</summary>
+    [HttpGet("Charts/ArtistBubbles")]
+    public ActionResult ChartsArtistBubbles([FromQuery] string window = "12m")
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetArtistBubbles(win);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Current and longest consecutive-days streak.</summary>
+    [HttpGet("Charts/Streak")]
+    public ActionResult ChartsStreak()
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var data = _charts.GetStreak();
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
     [HttpGet("Historical/Years")]
     public ActionResult GetHistoricalYears()
     {

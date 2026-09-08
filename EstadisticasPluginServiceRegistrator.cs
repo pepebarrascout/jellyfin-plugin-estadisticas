@@ -98,6 +98,9 @@ public sealed class EstadisticasPluginServiceRegistrator : IPluginServiceRegistr
         // Achievement service (transient) — calculates achievements and levels.
         serviceCollection.AddTransient<AchievementService>();
 
+        // Chart service (transient) — data for the "Gráficos" tab.
+        serviceCollection.AddTransient<ChartService>();
+
         // Playback tracker: hosted service that subscribes to playback events.
         serviceCollection.AddHostedService<PlaybackTrackerService>();
 
