@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Microsoft.Data.Sqlite;
 using Microsoft.Extensions.Logging;
 using Jellyfin.Plugin.Estadisticas.Data;
@@ -11,38 +12,45 @@ namespace Jellyfin.Plugin.Estadisticas.Services;
 /// Runs Top 50 and Bottom 50 queries against the plugin's SQLite DB.
 /// All windows exclude the current period (current week / month / year).
 ///
-/// Bottom queries use LEFT JOIN to include tracks/artists/genres/albums with 0 plays in
-/// the window. Tie-breaking for Bottom (v0.0.0.7):
-///   1. period_plays ASC
-///   2. total_plays ASC (historic)
-///   3. first_seen ASC  (chronological: the oldest track in the DB ranks first)
-///   4. name ASC (deterministic last resort)
-/// This makes the ranking stable and reproducible.
-///
-/// v0.0.0.8: optional year filter. When set (e.g. 1982), only songs whose release year
-/// matches are included in the results.
+/// v0.0.0.11 changes:
+/// - QueryCache: results cached for 1 hour to avoid timeouts on Raspberry Pi
+/// - Artista and Álbum are now SEPARATE columns (not combined)
+/// - track_artists used as fallback when tracks.album_artist is NULL
+/// - Albums GROUP BY (album_name, album_artist) to separate same-named albums
 /// </summary>
 public sealed class StatisticsService
 {
     private readonly SqliteDb _db;
     private readonly ILogger<StatisticsService> _logger;
+    private readonly QueryCache _cache;
 
-    public StatisticsService(SqliteDb db, ILogger<StatisticsService> logger)
+    public StatisticsService(SqliteDb db, ILogger<StatisticsService> logger, QueryCache cache)
     {
         _db = db;
         _logger = logger;
+        _cache = cache;
     }
 
     /// <summary>
-    /// Run a Top/Bottom 50 query.
+    /// Run a Top/Bottom 50 query. Results are cached for 1 hour.
     /// </summary>
-    /// <param name="yearFilter">Optional: only include songs released in this year.</param>
     public List<QueryResultRow> Query(
         QueryDimension dimension,
         QueryDirection direction,
         QueryWindow window,
         int limit = 50,
         int? yearFilter = null)
+    {
+        var cacheKey = $"Query:{dimension}:{direction}:{window}:{limit}:{yearFilter ?? 0}";
+        return _cache.GetOrSet(cacheKey, () => QueryUncached(dimension, direction, window, limit, yearFilter));
+    }
+
+    private List<QueryResultRow> QueryUncached(
+        QueryDimension dimension,
+        QueryDirection direction,
+        QueryWindow window,
+        int limit,
+        int? yearFilter)
     {
         var (start, end) = TimeWindow.GetRange(window);
         var startStr = start.ToString("o");
@@ -94,9 +102,10 @@ public sealed class StatisticsService
                 Rank = rank++,
                 ItemId = reader.IsDBNull(0) ? string.Empty : reader.GetString(0),
                 Name = reader.IsDBNull(1) ? string.Empty : reader.GetString(1),
-                Subtitle = reader.IsDBNull(2) ? null : reader.GetString(2),
-                PlayCount = reader.IsDBNull(3) ? 0 : reader.GetInt64(3),
-                TotalPlayCount = reader.IsDBNull(4) ? 0 : reader.GetInt64(4)
+                Artist = reader.IsDBNull(2) ? null : reader.GetString(2),
+                Album = reader.IsDBNull(3) ? null : reader.GetString(3),
+                PlayCount = reader.IsDBNull(4) ? 0 : reader.GetInt64(4),
+                TotalPlayCount = reader.IsDBNull(5) ? 0 : reader.GetInt64(5)
             });
         }
 
@@ -108,11 +117,7 @@ public sealed class StatisticsService
 
     /// <summary>
     /// Returns ONLY the Jellyfin ItemIds for the query result.
-    /// Used when building a playlist (we only need item ids, not the display rows).
-    /// For non-Songs dimensions (Artists/Albums/Genres), we resolve the matching songs
-    /// by descending play count within the window, then take the top `limit` distinct songs.
     /// </summary>
-    /// <param name="yearFilter">Optional: only include songs released in this year.</param>
     public List<string> GetItemIdsForPlaylist(
         QueryDimension dimension,
         QueryDirection direction,
@@ -120,12 +125,22 @@ public sealed class StatisticsService
         int limit = 50,
         int? yearFilter = null)
     {
+        var cacheKey = $"ItemIds:{dimension}:{direction}:{window}:{limit}:{yearFilter ?? 0}";
+        return _cache.GetOrSet(cacheKey, () => GetItemIdsForPlaylistUncached(dimension, direction, window, limit, yearFilter));
+    }
+
+    private List<string> GetItemIdsForPlaylistUncached(
+        QueryDimension dimension,
+        QueryDirection direction,
+        QueryWindow window,
+        int limit,
+        int? yearFilter)
+    {
         var (start, end) = TimeWindow.GetRange(window);
         var startStr = start.ToString("o");
         var endStr = end.ToString("o");
         var dirClause = direction == QueryDirection.Top ? "DESC" : "ASC";
         var yearClause = yearFilter.HasValue ? " AND t.year = @year" : "";
-        var yearClauseSongs = yearFilter.HasValue ? " AND t.year = @year" : "";
 
         using var conn = _db.OpenMain();
         using var cmd = conn.CreateCommand();
@@ -149,8 +164,8 @@ public sealed class StatisticsService
             return ids;
         }
 
-        // For aggregated dimensions: first get the top entities, then resolve songs.
-        var entityNames = new List<string>();
+        // For aggregated dimensions: get top entities, then resolve songs.
+        var entityNames = new List<(string name, string? extra)>();
         if (dimension == QueryDimension.Artists)
         {
             cmd.CommandText = direction == QueryDirection.Top
@@ -163,7 +178,7 @@ public sealed class StatisticsService
                 ? TopAlbumsSql(dirClause, yearClause)
                 : BottomAlbumsSql(dirClause, yearClause);
         }
-        else // Genres
+        else
         {
             cmd.CommandText = direction == QueryDirection.Top
                 ? TopGenresSql(dirClause, yearClause)
@@ -178,17 +193,16 @@ public sealed class StatisticsService
         {
             while (reader.Read())
             {
-                if (!reader.IsDBNull(1)) entityNames.Add(reader.GetString(1));
+                entityNames.Add((reader.IsDBNull(1) ? "" : reader.GetString(1), null));
             }
         }
 
-        // For each entity, find its best song in the window.
         var resultIds = new List<string>();
         var seen = new HashSet<string>(StringComparer.Ordinal);
         var orderClause = direction == QueryDirection.Top ? "DESC" : "ASC";
         var yearFilterSongClause = yearFilter.HasValue ? " AND t.year = @year" : "";
 
-        foreach (var entity in entityNames)
+        foreach (var (entity, _) in entityNames)
         {
             using var songCmd = conn.CreateCommand();
             songCmd.Parameters.AddWithValue("@start", startStr);
@@ -219,7 +233,7 @@ public sealed class StatisticsService
                     ORDER BY COUNT(p.id) {orderClause}, t.name ASC
                     LIMIT 1;";
             }
-            else // Genres
+            else
             {
                 songCmd.CommandText = $@"
                     SELECT t.item_id
@@ -244,22 +258,7 @@ public sealed class StatisticsService
     }
 
     /// <summary>
-    /// ItemIds for SCHEDULED playlists (v0.0.0.7).
-    ///
-    /// - Dimension = Songs:  ranked songs (most/least played in the window).
-    /// - Dimension = Genres: ranked songs of ONE genre (genreFilter). If genreFilter is
-    ///   empty it falls back to all songs.
-    /// - Artists/Albums are no longer offered for scheduled lists.
-    ///
-    /// v0.0.0.8: optional year filter. When set, only songs released in that year
-    /// are included.
-    ///
-    /// The `ascending` flag controls the ORDER INSIDE the playlist:
-    ///   ascending  = from the least played to the most played,
-    ///   descending = from the most played to the least played.
-    ///
-    /// Ties (same period plays) always resolve as: less historic plays first,
-    /// then chronological (first_seen ASC: the oldest registered tracks first).
+    /// ItemIds for SCHEDULED playlists.
     /// </summary>
     public List<string> GetScheduledItemIds(
         QueryDimension dimension,
@@ -268,6 +267,18 @@ public sealed class StatisticsService
         bool ascending,
         string? genreFilter,
         int? yearFilter = null)
+    {
+        var cacheKey = $"SchedIds:{dimension}:{window}:{limit}:{ascending}:{genreFilter}:{yearFilter ?? 0}";
+        return _cache.GetOrSet(cacheKey, () => GetScheduledItemIdsUncached(dimension, window, limit, ascending, genreFilter, yearFilter));
+    }
+
+    private List<string> GetScheduledItemIdsUncached(
+        QueryDimension dimension,
+        QueryWindow window,
+        int limit,
+        bool ascending,
+        string? genreFilter,
+        int? yearFilter)
     {
         var (start, end) = TimeWindow.GetRange(window);
         var startStr = start.ToString("o");
@@ -330,104 +341,130 @@ public sealed class StatisticsService
         return ids;
     }
 
-    /// <summary>
-    /// Distinct list of every genre known to the plugin DB (used by the
-    /// scheduled-playlists form to let the user pick one genre).
-    /// </summary>
+    /// <summary>Distinct genres, cached.</summary>
     public List<string> GetAllGenres()
     {
-        var genres = new List<string>();
-        using var conn = _db.OpenMain();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT DISTINCT genre FROM track_genres ORDER BY genre COLLATE NOCASE;";
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
+        return _cache.GetOrSet("AllGenres", () =>
         {
-            if (!reader.IsDBNull(0)) genres.Add(reader.GetString(0));
-        }
-        return genres;
-    }
-
-    /// <summary>
-    /// Distinct list of every release year known to the plugin DB (used by the
-    /// UI to populate the year selector). Ordered descending (newest first).
-    /// </summary>
-    public List<int> GetAllYears()
-    {
-        var years = new List<int>();
-        using var conn = _db.OpenMain();
-        using var cmd = conn.CreateCommand();
-        cmd.CommandText = "SELECT DISTINCT year FROM tracks WHERE year IS NOT NULL ORDER BY year DESC;";
-        using var reader = cmd.ExecuteReader();
-        while (reader.Read())
-        {
-            if (!reader.IsDBNull(0)) years.Add(reader.GetInt32(0));
-        }
-        return years;
-    }
-
-    /// <summary>
-    /// Total listening time (milliseconds) broken down by genre and time window.
-    /// Used by the "Resumen" tab to show the "Tiempo total escuchado" table.
-    ///
-    /// Approximation: sums the FULL duration of each track that was played in the
-    /// window, regardless of how many seconds the user actually listened. This is
-    /// the agreed tradeoff to avoid capturing position_ms (which would overload
-    /// the Raspberry Pi server with extra writes per play).
-    ///
-    /// Returns a dictionary: genre -> (windowCode -> totalMs).
-    /// Genres with 0 plays in ALL windows are excluded.
-    /// </summary>
-    public Dictionary<string, Dictionary<string, long>> GetListeningTimeByGenrePerWindow()
-    {
-        var result = new Dictionary<string, Dictionary<string, long>>(StringComparer.OrdinalIgnoreCase);
-        var windows = new[] { QueryWindow.TwoWeeks, QueryWindow.OneMonth, QueryWindow.ThreeMonths, QueryWindow.SixMonths, QueryWindow.TwelveMonths, QueryWindow.LastYear };
-
-        using var conn = _db.OpenMain();
-        foreach (var w in windows)
-        {
-            var (start, end) = TimeWindow.GetRange(w);
-            var startStr = start.ToString("o");
-            var endStr = end.ToString("o");
-            var code = TimeWindow.Code(w);
-
+            var genres = new List<string>();
+            using var conn = _db.OpenMain();
             using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT tg.genre, COALESCE(SUM(t.duration_ms), 0) AS total_ms
-                FROM plays p
-                JOIN tracks t ON t.item_id = p.item_id
-                JOIN track_genres tg ON tg.item_id = t.item_id
-                WHERE p.played_at >= @start AND p.played_at < @end
-                  AND t.duration_ms IS NOT NULL
-                GROUP BY tg.genre;";
-            cmd.Parameters.AddWithValue("@start", startStr);
-            cmd.Parameters.AddWithValue("@end", endStr);
-
+            cmd.CommandText = "SELECT DISTINCT genre FROM track_genres ORDER BY genre COLLATE NOCASE;";
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {
-                var genre = reader.GetString(0);
-                var totalMs = reader.GetInt64(1);
-                if (!result.TryGetValue(genre, out var row))
-                {
-                    row = new Dictionary<string, long>();
-                    result[genre] = row;
-                }
-                row[code] = totalMs;
+                if (!reader.IsDBNull(0)) genres.Add(reader.GetString(0));
             }
-        }
+            return genres;
+        });
+    }
 
-        return result;
+    /// <summary>Distinct years, cached.</summary>
+    public List<int> GetAllYears()
+    {
+        return _cache.GetOrSet("AllYears", () =>
+        {
+            var years = new List<int>();
+            using var conn = _db.OpenMain();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = "SELECT DISTINCT year FROM tracks WHERE year IS NOT NULL ORDER BY year DESC;";
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                if (!reader.IsDBNull(0)) years.Add(reader.GetInt32(0));
+            }
+            return years;
+        });
+    }
+
+    /// <summary>
+    /// Total listening time (ms) by genre and time window. Cached.
+    ///
+    /// The "total" column is the ALL-TIME total (no window filter), not the
+    /// sum of the 6 windows (which overlap).
+    /// </summary>
+    public Dictionary<string, Dictionary<string, long>> GetListeningTimeByGenrePerWindow()
+    {
+        return _cache.GetOrSet("ListeningTime", () =>
+        {
+            var result = new Dictionary<string, Dictionary<string, long>>(StringComparer.OrdinalIgnoreCase);
+            var windows = new[] { QueryWindow.TwoWeeks, QueryWindow.OneMonth, QueryWindow.ThreeMonths, QueryWindow.SixMonths, QueryWindow.TwelveMonths, QueryWindow.LastYear };
+
+            using var conn = _db.OpenMain();
+
+            // Per-window totals
+            foreach (var w in windows)
+            {
+                var (start, end) = TimeWindow.GetRange(w);
+                var startStr = start.ToString("o");
+                var endStr = end.ToString("o");
+                var code = TimeWindow.Code(w);
+
+                using var cmd = conn.CreateCommand();
+                cmd.CommandText = @"
+                    SELECT tg.genre, COALESCE(SUM(t.duration_ms), 0) AS total_ms
+                    FROM plays p
+                    JOIN tracks t ON t.item_id = p.item_id
+                    JOIN track_genres tg ON tg.item_id = t.item_id
+                    WHERE p.played_at >= @start AND p.played_at < @end
+                      AND t.duration_ms IS NOT NULL
+                    GROUP BY tg.genre;";
+                cmd.Parameters.AddWithValue("@start", startStr);
+                cmd.Parameters.AddWithValue("@end", endStr);
+
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var genre = reader.GetString(0);
+                    var totalMs = reader.GetInt64(1);
+                    if (!result.TryGetValue(genre, out var row))
+                    {
+                        row = new Dictionary<string, long>();
+                        result[genre] = row;
+                    }
+                    row[code] = totalMs;
+                }
+            }
+
+            // All-time total (no window filter) — this is the correct "Total" column
+            using (var cmd = conn.CreateCommand())
+            {
+                cmd.CommandText = @"
+                    SELECT tg.genre, COALESCE(SUM(t.duration_ms), 0) AS total_ms
+                    FROM plays p
+                    JOIN tracks t ON t.item_id = p.item_id
+                    JOIN track_genres tg ON tg.item_id = t.item_id
+                    WHERE t.duration_ms IS NOT NULL
+                    GROUP BY tg.genre;";
+                using var reader = cmd.ExecuteReader();
+                while (reader.Read())
+                {
+                    var genre = reader.GetString(0);
+                    var totalMs = reader.GetInt64(1);
+                    if (!result.TryGetValue(genre, out var row))
+                    {
+                        row = new Dictionary<string, long>();
+                        result[genre] = row;
+                    }
+                    row["total"] = totalMs;
+                }
+            }
+
+            return result;
+        });
     }
 
     // ---- SQL templates ----
-    // Each template accepts a `yearClause` string that is injected into the WHERE.
-    // When no year filter is active, yearClause is "" (empty string, no-op).
+    // Columns: item_id, name, artist, album, period_plays, total_plays
+    // artist: uses COALESCE(t.album_artist, (SELECT artist FROM track_artists WHERE item_id = t.item_id LIMIT 1))
+    //         to fallback to track_artists when album_artist is NULL
+    // album: separate column (not combined with artist)
 
     private static string TopSongsSql(string dir, string yearClause) => $@"
         SELECT t.item_id,
                t.name,
-               COALESCE(t.album_artist || ' - ' || t.album_name, t.album_name, t.album_artist, '') AS subtitle,
+               COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1)) AS artist,
+               t.album_name AS album,
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 WHERE p2.item_id = t.item_id) AS total_plays
         FROM plays p
@@ -440,7 +477,8 @@ public sealed class StatisticsService
     private static string BottomSongsSql(string dir, string yearClause) => $@"
         SELECT t.item_id,
                t.name,
-               COALESCE(t.album_artist || ' - ' || t.album_name, t.album_name, t.album_artist, '') AS subtitle,
+               COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1)) AS artist,
+               t.album_name AS album,
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 WHERE p2.item_id = t.item_id) AS total_plays
         FROM tracks t
@@ -453,7 +491,8 @@ public sealed class StatisticsService
     private static string TopArtistsSql(string dir, string yearClause) => $@"
         SELECT '' AS item_id,
                ta.artist AS name,
-               NULL AS subtitle,
+               NULL AS artist,
+               NULL AS album,
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 JOIN track_artists ta2 ON ta2.item_id = p2.item_id WHERE ta2.artist = ta.artist) AS total_plays
         FROM plays p
@@ -467,7 +506,8 @@ public sealed class StatisticsService
     private static string BottomArtistsSql(string dir, string yearClause) => $@"
         SELECT '' AS item_id,
                ta.artist AS name,
-               NULL AS subtitle,
+               NULL AS artist,
+               NULL AS album,
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 JOIN track_artists ta2 ON ta2.item_id = p2.item_id WHERE ta2.artist = ta.artist) AS total_plays
         FROM track_artists ta
@@ -478,12 +518,15 @@ public sealed class StatisticsService
         ORDER BY period_plays {dir}, total_plays ASC, MIN(t.first_seen) ASC, ta.artist ASC
         LIMIT @limit;";
 
+    // Albums: GROUP BY (album_name, album_artist) so same-named albums from
+    // different artists are separate rows. artist = album_artist (or fallback).
     private static string TopAlbumsSql(string dir, string yearClause) => $@"
         SELECT '' AS item_id,
-               COALESCE(t.album_name, '(Sin album)') AS name,
-               t.album_artist AS subtitle,
+               COALESCE(t.album_name, '(Sin álbum)') AS name,
+               COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1)) AS artist,
+               t.album_name AS album,
                COUNT(p.id) AS period_plays,
-               (SELECT COUNT(*) FROM plays p2 JOIN tracks t2 ON t2.item_id = p2.item_id WHERE t2.album_name = t.album_name AND t2.album_artist IS t.album_artist) AS total_plays
+               (SELECT COUNT(*) FROM plays p2 JOIN tracks t2 ON t2.item_id = p2.item_id WHERE t2.album_name IS t.album_name AND t2.album_artist IS t.album_artist) AS total_plays
         FROM plays p
         JOIN tracks t ON t.item_id = p.item_id
         WHERE p.played_at >= @start AND p.played_at < @end
@@ -494,8 +537,9 @@ public sealed class StatisticsService
 
     private static string BottomAlbumsSql(string dir, string yearClause) => $@"
         SELECT '' AS item_id,
-               COALESCE(t.album_name, '(Sin album)') AS name,
-               t.album_artist AS subtitle,
+               COALESCE(t.album_name, '(Sin álbum)') AS name,
+               COALESCE(t.album_artist, (SELECT ta.artist FROM track_artists ta WHERE ta.item_id = t.item_id LIMIT 1)) AS artist,
+               t.album_name AS album,
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 JOIN tracks t2 ON t2.item_id = p2.item_id WHERE t2.album_name IS t.album_name AND t2.album_artist IS t.album_artist) AS total_plays
         FROM tracks t
@@ -508,7 +552,8 @@ public sealed class StatisticsService
     private static string TopGenresSql(string dir, string yearClause) => $@"
         SELECT '' AS item_id,
                tg.genre AS name,
-               NULL AS subtitle,
+               NULL AS artist,
+               NULL AS album,
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 JOIN track_genres tg2 ON tg2.item_id = p2.item_id WHERE tg2.genre = tg.genre) AS total_plays
         FROM plays p
@@ -522,7 +567,8 @@ public sealed class StatisticsService
     private static string BottomGenresSql(string dir, string yearClause) => $@"
         SELECT '' AS item_id,
                tg.genre AS name,
-               NULL AS subtitle,
+               NULL AS artist,
+               NULL AS album,
                COUNT(p.id) AS period_plays,
                (SELECT COUNT(*) FROM plays p2 JOIN track_genres tg2 ON tg2.item_id = p2.item_id WHERE tg2.genre = tg.genre) AS total_plays
         FROM track_genres tg

@@ -183,6 +183,17 @@ public sealed class HistoricalArchiveService
     /// </summary>
     public void RunMonthlyMaintenance()
     {
+        RegenerateAggregates();
+        PurgeOldPlays();
+    }
+
+    /// <summary>
+    /// Regenerate ALL yearly aggregates from the main DB, WITHOUT purging.
+    /// This is safe to call anytime (e.g. from the "Regenerar histórico" button).
+    /// It reads all plays, groups by year, and writes the aggregates.
+    /// </summary>
+    public void RegenerateAggregates()
+    {
         // Find all years present in the plays table
         var years = new System.Collections.Generic.List<int>();
         using (var conn = _db.OpenMain())
@@ -196,13 +207,13 @@ public sealed class HistoricalArchiveService
             }
         }
 
+        _logger.LogInformation("Regenerating aggregates for {Count} years: {Years}", years.Count, string.Join(", ", years));
+
         foreach (var y in years.Distinct().OrderBy(x => x))
         {
             try { RefreshYearlyAggregate(y); }
             catch (Exception ex) { _logger.LogError(ex, "Failed to refresh aggregate for year {Year}", y); }
         }
-
-        PurgeOldPlays();
     }
 
     // ====== Query methods for the "Histórico" tab (v0.0.0.9) ======

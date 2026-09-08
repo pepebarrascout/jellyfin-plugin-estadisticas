@@ -474,13 +474,15 @@
             }
             const DIM_LABELS = { Songs: 'Canciones', Artists: 'Artistas', Albums: 'Álbumes', Genres: 'Géneros' };
             const dimHeader = DIM_LABELS[dimension] || 'Nombre';
-            const subtitleHeader = (dimension === 'Songs') ? 'Artista — Álbum' :
-                                   (dimension === 'Albums') ? 'Artista' : '';
+            // Separate columns for Artist and Album (not combined)
+            const showArtist = (dimension === 'Songs' || dimension === 'Albums');
+            const showAlbum = (dimension === 'Songs');
             let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 1em;">' +
                 '<thead><tr>' +
                 '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 3em; color: #888;">#</th>' +
                 '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">' + dimHeader + '</th>' +
-                (subtitleHeader ? '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">' + subtitleHeader + '</th>' : '') +
+                (showArtist ? '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">Artista</th>' : '') +
+                (showAlbum ? '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left;">Álbum</th>' : '') +
                 '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 8em;">Reproducciones (periodo)</th>' +
                 '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; width: 8em;">Reproducciones totales</th>' +
                 '</tr></thead><tbody>';
@@ -488,7 +490,8 @@
                 html += '<tr>' +
                     '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; color: #888;">' + r.Rank + '</td>' +
                     '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.Name) + '</td>' +
-                    (subtitleHeader ? '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.Subtitle || '') + '</td>' : '') +
+                    (showArtist ? '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.Artist || '') + '</td>' : '') +
+                    (showAlbum ? '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + escapeHtml(r.Album || '') + '</td>' : '') +
                     '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; color: #00a4dc; font-weight: 600;">' + r.PlayCount + '</td>' +
                     '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right;">' + r.TotalPlayCount + '</td>' +
                     '</tr>';
@@ -819,7 +822,7 @@
             Object.keys(labels).forEach(k => {
                 const count = wp[k];
                 const color = count > 0 ? '#a0e0a0' : '#e0a0a0';
-                html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + labels[k] + ' (' + k + ')</td><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; color: ' + color + ';">' + (count >= 0 ? count : '?') + '</td></tr>';
+                html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a;">' + labels[k] + '</td><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; color: ' + color + ';">' + (count >= 0 ? count : '?') + '</td></tr>';
             });
             html += '</tbody></table>';
 
@@ -836,13 +839,11 @@
                     html += '<h3 style="margin-top: 1.5em;">Tiempo total escuchado (aproximado)</h3>';
                     html += '<div class="fieldDescription" style="margin-bottom: 0.5em;">Suma la duración completa de cada canción reproducida en el periodo (no el tiempo real escuchado). Ordenado por total descendente.</div>';
 
-                    // Sort genres by total (sum of all windows) descending
+                    // Sort genres by all-time total (data[g]["total"]) descending
                     const genres = Object.keys(data);
                     const genreTotals = {};
                     genres.forEach(g => {
-                        let total = 0;
-                        winCols.forEach(w => { total += (data[g][w] || 0); });
-                        genreTotals[g] = total;
+                        genreTotals[g] = (data[g] && data[g]["total"]) || 0;
                     });
                     genres.sort((a, b) => (genreTotals[b] || 0) - (genreTotals[a] || 0));
 
@@ -860,9 +861,9 @@
                             html += '<tr><td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; font-weight: 600;">' + escapeHtml(g) + '</td>';
                             winCols.forEach(w => {
                                 const ms = (data[g] && data[g][w]) || 0;
-                                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-family: monospace;">' + (ms > 0 ? formatDuration(ms) : '—') + '</td>';
+                                html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-size: 0.95em;">' + (ms > 0 ? formatDuration(ms) : '—') + '</td>';
                             });
-                            html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-weight: 600; color: #00a4dc; font-family: monospace;">' + formatDuration(genreTotals[g] || 0) + '</td>';
+                            html += '<td style="padding: 0.45em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: right; font-weight: 600; color: #00a4dc; font-size: 0.95em;">' + formatDuration(genreTotals[g] || 0) + '</td>';
                             html += '</tr>';
                         });
                         html += '</tbody></table></div>';
@@ -875,16 +876,18 @@
             el.innerHTML = html;
         }
 
-        // Helper: format milliseconds as "Xh Ym Zs" (e.g. "38h 20m 15s")
+        // Helper: format milliseconds as "Xh YYm ZZs" (e.g. "131h 03m 05s")
+        // Zero-pads minutes and seconds to 2 digits for consistent alignment.
         function formatDuration(ms) {
             if (!ms || ms <= 0) return '0s';
             const totalSec = Math.floor(ms / 1000);
             const h = Math.floor(totalSec / 3600);
             const m = Math.floor((totalSec % 3600) / 60);
             const s = totalSec % 60;
-            if (h > 0) return h + 'h ' + m + 'm ' + s + 's';
-            if (m > 0) return m + 'm ' + s + 's';
-            return s + 's';
+            const pad2 = (n) => (n < 10 ? '0' : '') + n;
+            if (h > 0) return h + 'h ' + pad2(m) + 'm ' + pad2(s) + 's';
+            if (m > 0) return pad2(m) + 'm ' + pad2(s) + 's';
+            return pad2(s) + 's';
         }
         document.getElementById('debugRefresh').addEventListener('click', loadDebugStatus);
         document.getElementById('debugClear').addEventListener('click', () => {
@@ -962,7 +965,11 @@
         function renderHistoricalTable(rows, fields, headers) {
             if (!rows || rows.length === 0) return '<div class="fieldDescription">Sin datos.</div>';
             let html = '<table style="width: 100%; border-collapse: collapse; margin-top: 0.5em;"><thead><tr>';
-            headers.forEach(h => { html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: left; background: #1a1a1a;">' + h + '</th>'; });
+            headers.forEach((h, idx) => {
+                const isPlays = fields[idx] === 'playCount';
+                const align = isPlays ? 'right' : 'left';
+                html += '<th style="padding: 0.5em 0.6em; border-bottom: 1px solid #2a2a2a; text-align: ' + align + '; background: #1a1a1a;">' + h + '</th>';
+            });
             html += '</tr></thead><tbody>';
             rows.forEach((r, i) => {
                 html += '<tr>';

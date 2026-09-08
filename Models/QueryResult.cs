@@ -69,8 +69,11 @@ public sealed class QueryResultRow
     /// <summary>Display name (song title, artist name, album name, or genre).</summary>
     public string Name { get; set; } = string.Empty;
 
-    /// <summary>Secondary text (e.g. "Artist - Album" for songs, "Artist" for albums).</summary>
-    public string? Subtitle { get; set; }
+    /// <summary>Artist name (separate column). Null for Artists/Genres dimensions.</summary>
+    public string? Artist { get; set; }
+
+    /// <summary>Album name (separate column). Null for Artists/Genres dimensions.</summary>
+    public string? Album { get; set; }
 
     /// <summary>Play count within the queried window.</summary>
     public long PlayCount { get; set; }

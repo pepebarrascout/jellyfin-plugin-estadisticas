@@ -47,6 +47,9 @@ public sealed class EstadisticasPluginServiceRegistrator : IPluginServiceRegistr
             return db;
         });
 
+        // Query cache (singleton — shared across all requests)
+        serviceCollection.AddSingleton<QueryCache>();
+
         // Statistics service (transient — cheap to construct, just runs SQL).
         serviceCollection.AddTransient<StatisticsService>();
 

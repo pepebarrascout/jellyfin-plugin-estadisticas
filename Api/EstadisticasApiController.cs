@@ -332,7 +332,7 @@ public sealed class EstadisticasApiController : ControllerBase
         if (!EnsureDbReady(out var err)) return err;
         try
         {
-            _historical.RunMonthlyMaintenance();
+            _historical.RegenerateAggregates();
             var years = _historical.GetAvailableYears();
             return Ok(new { success = true, yearsGenerated = years, message = $"Histórico regenerado. Años disponibles: {string.Join(", ", years)}" });
         }
@@ -588,7 +588,7 @@ public sealed class EstadisticasApiController : ControllerBase
                 foreach (var r in rows)
                 {
                     htmlList.Append("<li>").Append(EscapeHtml(r.Name));
-                    if (!string.IsNullOrEmpty(r.Subtitle)) htmlList.Append(" — ").Append(EscapeHtml(r.Subtitle));
+                    if (!string.IsNullOrEmpty(r.Artist)) htmlList.Append(" — ").Append(EscapeHtml(r.Artist));
                     htmlList.Append(" (").Append(r.PlayCount).Append(" reproducciones)</li>");
                 }
                 htmlList.Append("</ol>]]></description>");
