@@ -74,8 +74,8 @@ public sealed class HistoricalArchiveService
                 ins.Parameters.AddWithValue("@y", year);
                 ins.Parameters.AddWithValue("@id", reader.GetString(0));
                 ins.Parameters.AddWithValue("@n", reader.GetString(1));
-                ins.Parameters.AddWithValue("@aa", reader.IsDBNull(2) ? (object?)null : reader.GetString(2));
-                ins.Parameters.AddWithValue("@an", reader.IsDBNull(3) ? (object?)null : reader.GetString(3));
+                ins.Parameters.AddWithValue("@aa", reader.IsDBNull(2) ? DBNull.Value : reader.GetString(2));
+                ins.Parameters.AddWithValue("@an", reader.IsDBNull(3) ? DBNull.Value : reader.GetString(3));
                 ins.Parameters.AddWithValue("@pc", reader.GetInt64(4));
                 ins.Parameters.AddWithValue("@td", reader.GetInt64(5));
                 ins.ExecuteNonQuery();
@@ -147,7 +147,7 @@ public sealed class HistoricalArchiveService
                 ins.CommandText = @"INSERT INTO yearly_albums (year, album_artist, album_name, play_count)
                     VALUES (@y, @aa, @an, @pc);";
                 ins.Parameters.AddWithValue("@y", year);
-                ins.Parameters.AddWithValue("@aa", reader.IsDBNull(0) ? (object?)null : reader.GetString(0));
+                ins.Parameters.AddWithValue("@aa", reader.IsDBNull(0) ? DBNull.Value : reader.GetString(0));
                 ins.Parameters.AddWithValue("@an", reader.GetString(1));
                 ins.Parameters.AddWithValue("@pc", reader.GetInt64(2));
                 ins.ExecuteNonQuery();

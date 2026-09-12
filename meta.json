@@ -5,9 +5,9 @@
   "overview": "Estadisticas de musica independientes: Top 50 y Bottom 50 por cancion/artista/album/genero en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. Purga automatica a los 14 meses con archivo historico anual.",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "0.0.0.14",
-  "changelog": "- FIXED: Heatmap ahora respeta la ventana temporal seleccionada (antes siempre 12 meses).\n- FIXED: Heatmap con escala de colores dinamica basada en el valor maximo. Verde oscuro = menos, verde brillante = maximo.\n- FIXED: Graficos de hora y dia cambiados de polarArea (circular) a barras (mas legibles).\n- FIXED: Tamano de fuente +2 en todos los textos de graficos (ejes, leyendas, tooltips).\n- FIXED: Boton 'Actualizar graficos' ahora ocupa su propia fila (clase block).\n- NEW: Sub-pestaña Portadas: album del mes (top 3), artista del mes (top 3), collage de top 50 albumes, descubrimientos recientes.\n- NEW: Sub-pestaña Recap: tarjetas de resumen (top genero/artista/cancion, totales), comparativa de trimestres por genero, evolucion de top 5 generos por mes.\n- NEW: 4 endpoints: /Charts/Recap, /Charts/QuarterCompare, /Charts/GenreEvolution, /Charts/Discoveries.\n- NEW: ChartService con metodos GetRecap, GetQuarterCompare, GetGenreEvolution, GetDiscoveries.",
+  "version": "0.0.0.15",
+  "changelog": "- CRITICAL FIX: AmbiguousMatchException en /Historical/Years. Un atributo [HttpGet] huérfano causaba que la ruta coincidiera con múltiples endpoints. Eliminado.\n- CRITICAL FIX: 'Value must be set' en RefreshYearlyAggregate. Los parámetros null usaban (object?)null en vez de DBNull.Value, causando que SQLite rechazara la inserción. Corregido en yearly_songs y yearly_albums.\n- Estos dos bugs impedían que el histórico se generara y que las consultas funcionaran correctamente.",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-09-08T06:30:00Z",
+  "timestamp": "2026-09-12T00:30:00Z",
   "imagePath": "logo.png"
 }

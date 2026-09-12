@@ -265,11 +265,6 @@ public sealed class EstadisticasApiController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Returns the list of years available in the historical DB (v0.0.0.9).
-    /// </summary>
-    [HttpGet("Historical/Years")]
-
     // ====== CHARTS ENDPOINTS (v0.0.0.13) ======
 
     /// <summary>Plays per day for timeline chart.</summary>
