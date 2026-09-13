@@ -5,9 +5,9 @@
   "overview": "Estadisticas de musica independientes: Top 50 y Bottom 50 por cancion/artista/album/genero en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. Purga automatica a los 14 meses con archivo historico anual.",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "0.0.0.17",
-  "changelog": "- NEW: Script resolve_item_ids.py para llenar album_item_id y artist_item_id de tracks existentes.\n- FIXED: Portadas ahora tiene su propio selector de ventana temporal + botón Actualizar.\n- FIXED: Álbum del período muestra nombre del álbum, artista y reproducciones en líneas separadas.\n- FIXED: Artista del período muestra nombre, reproducciones, canciones y tiempo en líneas separadas.\n- FIXED: Collage dice 'Top 25 álbumes' (no 50). Imágenes 320x320px. Tooltip muestra álbum + artista + reproducciones.\n- FIXED: Descubrimientos con imágenes 320x320px y tooltip con canción + artista.\n- FIXED: Heatmap excluye la semana actual (respeta ventana temporal). Max/min calculados correctamente.\n- FIXED: Géneros Musicales con barras más anchas (height 250) para mostrar todos los géneros.\n- FIXED: Artistas - Descubrimientos con eje Y dual (izquierda=plays/songs, derecha=tiempo HH:MM:SS).\n- FIXED: Formato de fecha dd-MM-yyyy en todas las gráficas (antes yyyy-MM-dd).",
+  "version": "0.0.0.18",
+  "changelog": "- FIXED: DLL con versión correcta (0.0.0.18). En v0.0.0.17 el DLL tenía versión 0.0.0.16 causando que Jellyfin cargara dos versiones del plugin simultáneamente (ObjectDisposedException).\n- IMPORTANTE: Si tienes el error ObjectDisposedException, borra la carpeta del plugin viejo (Estadisticas_0.0.0.16 o Estadisticas_0.0.0.17) antes de instalar esta versión.",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-09-13T03:00:00Z",
+  "timestamp": "2026-09-13T04:00:00Z",
   "imagePath": "logo.png"
 }
