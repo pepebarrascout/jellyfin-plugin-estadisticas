@@ -5,9 +5,9 @@
   "overview": "Estadisticas de musica independientes: Top 50 y Bottom 50 por cancion/artista/album/genero en ventanas de 2 semanas, 1, 3, 6 y 12 meses, y ano anterior. Base de datos SQLite propia. Purga automatica a los 14 meses con archivo historico anual.",
   "owner": "pepebarrascout",
   "category": "Music",
-  "version": "0.0.0.15",
-  "changelog": "- CRITICAL FIX: AmbiguousMatchException en /Historical/Years. Un atributo [HttpGet] huérfano causaba que la ruta coincidiera con múltiples endpoints. Eliminado.\n- CRITICAL FIX: 'Value must be set' en RefreshYearlyAggregate. Los parámetros null usaban (object?)null en vez de DBNull.Value, causando que SQLite rechazara la inserción. Corregido en yearly_songs y yearly_albums.\n- Estos dos bugs impedían que el histórico se generara y que las consultas funcionaran correctamente.",
+  "version": "0.0.0.16",
+  "changelog": "- NEW: Pestaña Logros movida a Gráficos > Retos (debajo de Racha). Gamificación renombrada a Retos.\n- FIXED: Timeline sin interpolación (tension: 0).\n- FIXED: Heatmap con colores invertidos (oscuro=máximo, claro=mínimo). Cuadros más grandes (18px). 7 días completos con nombres completos alineados a la izquierda. Max/min del periodo mostrados a la derecha con estilo similar a Racha.\n- FIXED: ByHour con colores en grupos de 6h (0-5, 6-11, 12-17, 18-23). Tooltip muestra '13:00 hrs'.\n- FIXED: ByDay tooltip muestra nombre completo del día (Lunes, Martes, etc.).\n- NEW: Treemap cambiado a barras horizontal 'Géneros Musicales'. 'Otros' cambiado a 'Demás Géneros'.\n- NEW: Gráfica Décadas (barras vertical, 60s 70s 80s etc). Lado a lado con Géneros Musicales.\n- NEW: Bubble chart cambiado a grouped bar 'Artistas - Descubrimientos' (10 artistas, 3 métricas: plays, canciones, horas).\n- NEW: Portadas rediseñadas: usa /Charts/TopAlbums y /Charts/TopArtists con albumItemId/artistItemId de Jellyfin. Imágenes 320px. 25 resultados. Selector de ventana temporal. Tooltips con nombre del álbum/artista.\n- NEW: Schema: columnas album_item_id y artist_item_id en tracks (cache de ItemIds de Jellyfin para cover art).\n- NEW: Endpoints /Charts/Decades, /Charts/TopAlbums, /Charts/TopArtists.",
   "targetAbi": "10.11.0.0",
-  "timestamp": "2026-09-12T00:30:00Z",
+  "timestamp": "2026-09-13T01:00:00Z",
   "imagePath": "logo.png"
 }

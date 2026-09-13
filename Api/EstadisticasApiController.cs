@@ -415,6 +415,48 @@ public sealed class EstadisticasApiController : ControllerBase
         catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
     }
 
+    /// <summary>Plays by decade (based on track release year).</summary>
+    [HttpGet("Charts/Decades")]
+    public ActionResult ChartsDecades([FromQuery] string window = "12m")
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetDecades(win);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Top N albums with albumItemId for cover art.</summary>
+    [HttpGet("Charts/TopAlbums")]
+    public ActionResult ChartsTopAlbums([FromQuery] string window = "1m", [FromQuery] int limit = 25)
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetTopAlbums(win, limit);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
+    /// <summary>Top N artists with artistItemId for cover art.</summary>
+    [HttpGet("Charts/TopArtists")]
+    public ActionResult ChartsTopArtists([FromQuery] string window = "1m", [FromQuery] int limit = 3)
+    {
+        if (!EnsureDbReady(out var err)) return err;
+        try
+        {
+            var win = TimeWindow.ParseCode(window);
+            var data = _charts.GetTopArtists(win, limit);
+            return Ok(new { success = true, data });
+        }
+        catch (Exception ex) { return Ok(new { success = false, error = ex.Message }); }
+    }
+
     [HttpGet("Historical/Years")]
     public ActionResult GetHistoricalYears()
     {

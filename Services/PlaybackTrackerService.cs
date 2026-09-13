@@ -184,8 +184,10 @@ public sealed class PlaybackTrackerService : IHostedService, IDisposable
             var durationMs = item.RunTimeTicks.HasValue ? (long)(item.RunTimeTicks.Value / TimeSpan.TicksPerMillisecond) : (long?)null;
             var filePath = item.Path;
             // Year: capture from ProductionYear (year the song/album was released).
-            // Stored for future filtering (e.g. "most listened of 1982").
             var year = item.ProductionYear;
+            // Cache Jellyfin ItemIds for album and artist (for cover art in Portadas tab)
+            var albumItemId = audioItem?.AlbumEntity?.Id.ToString() ?? null;
+            var artistItemId = audioItem?.AlbumEntity?.MusicArtist?.Id.ToString() ?? null;
 
             // Multi-valued artists and genres
             var artists = audioItem?.Artists?.ToList() ?? new();
@@ -208,8 +210,8 @@ public sealed class PlaybackTrackerService : IHostedService, IDisposable
             {
                 cmd.Transaction = tx;
                 cmd.CommandText = @"
-                    INSERT INTO tracks (item_id, name, album_artist, album_name, duration_ms, file_path, year, first_seen, last_updated)
-                    VALUES (@id, @name, @aa, @an, @dur, @fp, @year, @now, @now)
+                    INSERT INTO tracks (item_id, name, album_artist, album_name, duration_ms, file_path, year, album_item_id, artist_item_id, first_seen, last_updated)
+                    VALUES (@id, @name, @aa, @an, @dur, @fp, @year, @aitemid, @artitemid, @now, @now)
                     ON CONFLICT(item_id) DO UPDATE SET
                         name = excluded.name,
                         album_artist = excluded.album_artist,
@@ -217,6 +219,8 @@ public sealed class PlaybackTrackerService : IHostedService, IDisposable
                         duration_ms = excluded.duration_ms,
                         file_path = excluded.file_path,
                         year = excluded.year,
+                        album_item_id = COALESCE(excluded.album_item_id, tracks.album_item_id),
+                        artist_item_id = COALESCE(excluded.artist_item_id, tracks.artist_item_id),
                         last_updated = excluded.last_updated;";
                 AddParam(cmd, "@id", tracker.ItemId);
                 AddParam(cmd, "@name", name);
@@ -225,6 +229,8 @@ public sealed class PlaybackTrackerService : IHostedService, IDisposable
                 AddParam(cmd, "@dur", (object?)durationMs ?? DBNull.Value);
                 AddParam(cmd, "@fp", (object?)filePath ?? DBNull.Value);
                 AddParam(cmd, "@year", (object?)year ?? DBNull.Value);
+                AddParam(cmd, "@aitemid", (object?)albumItemId ?? DBNull.Value);
+                AddParam(cmd, "@artitemid", (object?)artistItemId ?? DBNull.Value);
                 AddParam(cmd, "@now", nowUtc);
                 cmd.ExecuteNonQuery();
             }

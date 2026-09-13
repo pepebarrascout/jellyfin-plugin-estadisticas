@@ -544,4 +544,125 @@ public sealed class ChartService
         var quarterMonth = ((month - 1) / 3) * 3 + 1; // 1, 4, 7, 10
         return new DateTime(now.Year, quarterMonth, 1, 0, 0, 0);
     }
+
+    /// <summary>
+    /// Plays by decade (based on track release year). For the Décadas chart.
+    /// Returns [{decade: "80s", label: "Años 80s", plays: 5400}].
+    /// </summary>
+    public List<Dictionary<string, object>> GetDecades(QueryWindow window)
+    {
+        var cacheKey = $"Chart:Decades:{window}";
+        return _cache.GetOrSet(cacheKey, () =>
+        {
+            var (start, end) = TimeWindow.GetRange(window);
+            var result = new List<Dictionary<string, object>>();
+            using var conn = _db.OpenMain();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT (t.year / 10) * 10 AS decade, COUNT(*) AS plays
+                FROM plays p JOIN tracks t ON t.item_id = p.item_id
+                WHERE p.played_at >= @start AND p.played_at < @end
+                  AND t.year IS NOT NULL
+                GROUP BY decade ORDER BY decade;";
+            cmd.Parameters.AddWithValue("@start", start.ToString("o"));
+            cmd.Parameters.AddWithValue("@end", end.ToString("o"));
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                var decade = reader.GetInt32(0);
+                var plays = reader.GetInt64(1);
+                result.Add(new Dictionary<string, object>
+                {
+                    ["decade"] = decade,
+                    ["label"] = $"{decade}'s",
+                    ["plays"] = plays
+                });
+            }
+            return result;
+        });
+    }
+
+    /// <summary>
+    /// Top N albums (aggregated by album_name + album_artist, with album_item_id for cover art).
+    /// Returns [{albumName, albumArtist, albumItemId, artistItemId, playCount}].
+    /// </summary>
+    public List<Dictionary<string, object>> GetTopAlbums(QueryWindow window, int limit)
+    {
+        var cacheKey = $"Chart:TopAlbums:{window}:{limit}";
+        return _cache.GetOrSet(cacheKey, () =>
+        {
+            var (start, end) = TimeWindow.GetRange(window);
+            var result = new List<Dictionary<string, object>>();
+            using var conn = _db.OpenMain();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT t.album_name, t.album_artist, t.album_item_id, t.artist_item_id,
+                       COUNT(p.id) AS plays
+                FROM plays p JOIN tracks t ON t.item_id = p.item_id
+                WHERE p.played_at >= @start AND p.played_at < @end
+                  AND t.album_name IS NOT NULL
+                GROUP BY t.album_name, t.album_artist, t.album_item_id, t.artist_item_id
+                ORDER BY plays DESC LIMIT @limit;";
+            cmd.Parameters.AddWithValue("@start", start.ToString("o"));
+            cmd.Parameters.AddWithValue("@end", end.ToString("o"));
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(new Dictionary<string, object>
+                {
+                    ["albumName"] = reader.IsDBNull(0) ? null : reader.GetString(0),
+                    ["albumArtist"] = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    ["albumItemId"] = reader.IsDBNull(2) ? null : reader.GetString(2),
+                    ["artistItemId"] = reader.IsDBNull(3) ? null : reader.GetString(3),
+                    ["playCount"] = reader.GetInt64(4)
+                });
+            }
+            return result;
+        });
+    }
+
+    /// <summary>
+    /// Top N artists (with artist_item_id for cover art, resolved from track_artists JOIN).
+    /// Returns [{artist, artistItemId, playCount, distinctSongs, durationMs}].
+    /// </summary>
+    public List<Dictionary<string, object>> GetTopArtists(QueryWindow window, int limit)
+    {
+        var cacheKey = $"Chart:TopArtists:{window}:{limit}";
+        return _cache.GetOrSet(cacheKey, () =>
+        {
+            var (start, end) = TimeWindow.GetRange(window);
+            var result = new List<Dictionary<string, object>>();
+            using var conn = _db.OpenMain();
+            using var cmd = conn.CreateCommand();
+            cmd.CommandText = @"
+                SELECT ta.artist,
+                       (SELECT t.artist_item_id FROM tracks t WHERE t.item_id = ta.item_id LIMIT 1) AS artist_item_id,
+                       COUNT(p.id) AS plays,
+                       COUNT(DISTINCT p.item_id) AS distinct_songs,
+                       COALESCE(SUM(t2.duration_ms), 0) AS total_ms
+                FROM plays p
+                JOIN track_artists ta ON ta.item_id = p.item_id
+                JOIN tracks t2 ON t2.item_id = p.item_id
+                WHERE p.played_at >= @start AND p.played_at < @end
+                GROUP BY ta.artist
+                ORDER BY plays DESC LIMIT @limit;";
+            cmd.Parameters.AddWithValue("@start", start.ToString("o"));
+            cmd.Parameters.AddWithValue("@end", end.ToString("o"));
+            cmd.Parameters.AddWithValue("@limit", limit);
+            using var reader = cmd.ExecuteReader();
+            while (reader.Read())
+            {
+                result.Add(new Dictionary<string, object>
+                {
+                    ["artist"] = reader.GetString(0),
+                    ["artistItemId"] = reader.IsDBNull(1) ? null : reader.GetString(1),
+                    ["playCount"] = reader.GetInt64(2),
+                    ["distinctSongs"] = reader.GetInt64(3),
+                    ["durationMs"] = reader.GetInt64(4)
+                });
+            }
+            return result;
+        });
+    }
 }

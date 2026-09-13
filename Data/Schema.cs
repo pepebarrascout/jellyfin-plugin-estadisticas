@@ -27,6 +27,8 @@ internal static class Schema
                 duration_ms INTEGER,
                 file_path TEXT,
                 year INTEGER,
+                album_item_id TEXT,
+                artist_item_id TEXT,
                 first_seen TEXT NOT NULL,
                 last_updated TEXT NOT NULL
             );");
@@ -34,6 +36,8 @@ internal static class Schema
         // Migration: add 'year' column to tracks if it doesn't exist (for upgrades from v0.0.0.4 or earlier).
         // SQLite doesn't have "IF NOT EXISTS" for ADD COLUMN, so we check the schema first.
         AddColumnIfMissing(tx, "tracks", "year", "INTEGER");
+        AddColumnIfMissing(tx, "tracks", "album_item_id", "TEXT");
+        AddColumnIfMissing(tx, "tracks", "artist_item_id", "TEXT");
 
         // Artists are multi-valued per track (e.g. "Artist A feat. Artist B").
         // Each artist is counted separately in Top/Bottom artist queries.

@@ -17,7 +17,6 @@
                 <a class="emby-button" href="#" data-role="button" data-tab="sched">Listas programadas</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="resumen">Resumen</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="historico">Histórico</a>
-                <a class="emby-button" href="#" data-role="button" data-tab="logros">Logros</a>
                 <a class="emby-button" href="#" data-role="button" data-tab="graficos">Gráficos</a>
             </div>
 
@@ -277,20 +276,6 @@
                 <div id="histResults"></div>
             </div>
 
-            <!-- ====== LOGROS TAB ====== -->
-            <div id="tab-logros" class="page-content hide">
-                <h2>Logros y niveles</h2>
-                <div class="fieldDescription" style="margin-bottom: 1em;">
-                    Insignias y niveles ganados según tu historial de escucha. Los niveles se calculan por mes, semestre y año calendario (hora local del servidor).
-                </div>
-
-                <div style="margin: 1em 0;">
-                    <button is="emby-button" type="button" class="raised button-submit" id="achievementsRefresh">Actualizar logros</button>
-                </div>
-
-                <div id="achievementsResults"></div>
-            </div>
-
             <!-- ====== GRÁFICOS TAB ====== -->
             <div id="tab-graficos" class="page-content hide">
                 <h2>Gráficos</h2>
@@ -300,7 +285,7 @@
                     <a class="emby-button graficoSubTab active" href="#" data-role="button" data-subtab="estadisticas">Estadísticas</a>
                     <a class="emby-button graficoSubTab" href="#" data-role="button" data-subtab="portadas">Portadas</a>
                     <a class="emby-button graficoSubTab" href="#" data-role="button" data-subtab="recap">Recap</a>
-                    <a class="emby-button graficoSubTab" href="#" data-role="button" data-subtab="gamificacion">Gamificación</a>
+                    <a class="emby-button graficoSubTab" href="#" data-role="button" data-subtab="retos">Retos</a>
                 </div>
 
                 <!-- Sub-tab: Estadísticas (6 charts) -->
@@ -345,12 +330,24 @@
                         </div>
                     </div>
 
-                    <h3>Treemap de géneros</h3>
-                    <div id="chartTreemapContainer" style="background: #1a1a1a; border-radius: 6px; padding: 1em; margin-bottom: 1.5em;"></div>
+                    <div style="display: flex; gap: 2em; flex-wrap: wrap; margin-bottom: 1.5em;">
+                        <div style="flex: 1; min-width: 20em;">
+                            <h3>Géneros Musicales</h3>
+                            <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
+                                <canvas id="chartGenres" height="120"></canvas>
+                            </div>
+                        </div>
+                        <div style="flex: 1; min-width: 20em;">
+                            <h3>Décadas</h3>
+                            <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
+                                <canvas id="chartDecades" height="120"></canvas>
+                            </div>
+                        </div>
+                    </div>
 
-                    <h3>Artistas por popularidad vs. diversidad</h3>
+                    <h3>Artistas - Descubrimientos</h3>
                     <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
-                        <canvas id="chartBubbles" height="100"></canvas>
+                        <canvas id="chartArtists" height="100"></canvas>
                     </div>
                 </div>
 
@@ -387,11 +384,19 @@
                     </div>
                 </div>
 
-                <!-- Sub-tab: Gamificación (streak + badges) -->
-                <div id="subtab-gamificacion" class="graficoSubPanel" style="display: none;">
+                <!-- Sub-tab: Retos (streak + achievements) -->
+                <div id="subtab-retos" class="graficoSubPanel" style="display: none;">
                     <h3>Racha de días consecutivos</h3>
                     <div id="streakContainer" style="background: #1a1a1a; border-radius: 6px; padding: 1.5em; margin-bottom: 1.5em; text-align: center;"></div>
-                    <div class="fieldDescription">Las insignias y niveles se encuentran en la pestaña "Logros".</div>
+
+                    <h3>Logros y niveles</h3>
+                    <div class="fieldDescription" style="margin-bottom: 1em;">
+                        Insignias y niveles ganados según tu historial de escucha.
+                    </div>
+                    <div style="margin: 1em 0;">
+                        <button is="emby-button" type="button" class="raised button-submit" id="achievementsRefreshRetos">Actualizar logros</button>
+                    </div>
+                    <div id="achievementsResultsRetos"></div>
                 </div>
             </div>
 
@@ -615,7 +620,6 @@
             if (tabName === 'sched') loadScheduled();
             if (tabName === 'resumen') loadDebugStatus();
             if (tabName === 'historico') loadHistoricalYears();
-            if (tabName === 'logros') loadAchievements();
             if (tabName === 'graficos') loadCharts();
         }
         page.querySelectorAll('[data-tab]').forEach(btn => {
@@ -1203,8 +1207,8 @@
         });
 
         // --- LOGROS TAB (v0.0.0.9) ---
-        async function loadAchievements() {
-            const el = document.getElementById('achievementsResults');
+        async function loadAchievementsRetos() {
+            const el = document.getElementById('achievementsResultsRetos');
             if (!el) return;
             el.innerHTML = '<div class="fieldDescription">Cargando logros...</div>';
             const r = await apiGet('/Achievements');
@@ -1264,7 +1268,7 @@
 
             el.innerHTML = html;
         }
-        document.getElementById('achievementsRefresh').addEventListener('click', loadAchievements);
+        document.getElementById('achievementsRefreshRetos').addEventListener('click', loadAchievementsRetos);
 
         // --- GRÁFICOS TAB (v0.0.0.13) ---
         let chartJsLoaded = false;
@@ -1291,7 +1295,7 @@
                 if (sub === 'estadisticas') loadCharts();
                 if (sub === 'portadas') loadPortadas();
                 if (sub === 'recap') loadRecap();
-                if (sub === 'gamificacion') loadStreak();
+                if (sub === 'retos') { loadStreak(); loadAchievementsRetos(); }
             });
         });
 
@@ -1330,16 +1334,22 @@
                 if (r4.success) renderByDay(r4.data);
             } catch (e) {}
 
-            // Genre treemap
+            // Genre treemap → now horizontal bar chart
             try {
                 const r5 = await apiGet('/Charts/GenreTreemap?window=' + win);
-                if (r5.success) renderTreemap(r5.data);
+                if (r5.success) renderGenres(r5.data);
             } catch (e) {}
 
-            // Artist bubbles
+            // Decades
+            try {
+                const r7 = await apiGet('/Charts/Decades?window=' + win);
+                if (r7.success) renderDecades(r7.data);
+            } catch (e) {}
+
+            // Artist bubbles → now grouped bar
             try {
                 const r6 = await apiGet('/Charts/ArtistBubbles?window=' + win);
-                if (r6.success) renderBubbles(r6.data);
+                if (r6.success) renderArtists(r6.data);
             } catch (e) {}
         }
 
@@ -1351,7 +1361,7 @@
             const counts = data.map(d => d.count);
             timelineChart = new Chart(ctx, {
                 type: 'line',
-                data: { labels, datasets: [{ label: 'Reproducciones por día', data: counts, borderColor: '#00a4dc', backgroundColor: 'rgba(0,164,220,0.1)', fill: true, tension: 0.3 }] },
+                data: { labels, datasets: [{ label: 'Reproducciones por día', data: counts, borderColor: '#00a4dc', backgroundColor: 'rgba(0,164,220,0.1)', fill: true, tension: 0 }] },
                 options: { responsive: true, plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } }, scales: { x: { ticks: { color: '#aaa', font: { size: 13 }, maxTicksLimit: 12 } }, y: { title: { display: true, text: 'Reproducciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true } } }
             });
         }
@@ -1359,77 +1369,108 @@
         function renderHeatmap(data) {
             const container = document.getElementById('chartHeatmapContainer');
             if (!container) return;
-            // Build a map: date -> count
             const map = {};
             data.forEach(d => { map[d.date] = d.count; });
-            // Find max value for dynamic color scale
-            const maxCount = Math.max(1, ...Object.values(map));
+            const allCounts = Object.values(map);
+            const maxCount = Math.max(1, ...allCounts);
+            const nonZero = allCounts.filter(c => c > 0);
+            const minCount = nonZero.length > 0 ? Math.min(...nonZero) : 0;
 
-            // Build grid: weeks as columns, days as rows (Mon-Sun)
+            // Find max and min dates
+            let maxEntry = null, minEntry = null;
+            data.forEach(d => {
+                if (d.count > 0) {
+                    if (!maxEntry || d.count > maxEntry.count) maxEntry = d;
+                    if (!minEntry || d.count < minEntry.count) minEntry = d;
+                }
+            });
+
             const today = new Date();
             const startDate = new Date(today);
-            startDate.setDate(startDate.getDate() - 364); // ~52 weeks back
+            startDate.setDate(startDate.getDate() - 364);
             const dayOfWeek = (startDate.getDay() + 6) % 7;
             startDate.setDate(startDate.getDate() - dayOfWeek);
 
-            const dayLabels = ['Lun', '', 'Mié', '', 'Vie', '', 'Dom'];
+            const dayLabels = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
             const monthLabels = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
 
-            // Dynamic color: interpolate from dark (#0d1a14) to bright (#00ff66) based on count/maxCount
+            // INVERTED: dark = max, light = min. count=0 is gray.
+            // Hue 140 (green), lightness: 55% (light, for low) to 15% (dark, for max)
             function heatColor(count) {
-                if (count === 0) return '#1a1a1a';
+                if (count === 0) return '#2a2a2a';
                 const ratio = Math.min(1, count / maxCount);
-                // HSL: hue=140 (green), saturation=100%, lightness from 15% (dark) to 55% (bright)
-                const lightness = 15 + ratio * 40;
+                const lightness = 55 - ratio * 40; // 55% (light) → 15% (dark)
                 return 'hsl(140, 100%, ' + lightness + '%)';
             }
 
-            let html = '<div style="display: inline-block;">';
+            // Layout: grid on left, stats on right
+            let html = '<div style="display: flex; gap: 1.5em; flex-wrap: wrap;">';
+            // Left: grid
+            html += '<div style="display: inline-block;">';
             // Month labels
-            html += '<div style="display: flex; margin-left: 2em;">';
+            html += '<div style="display: flex; margin-left: 4em;">';
             let lastMonth = -1;
             for (let w = 0; w < 53; w++) {
                 const d = new Date(startDate);
                 d.setDate(d.getDate() + w * 7);
                 const m = d.getMonth();
                 if (m !== lastMonth) {
-                    html += '<div style="width: 13px; font-size: 0.8em; color: #888; margin-right: 1px;">' + monthLabels[m] + '</div>';
+                    html += '<div style="width: 18px; font-size: 0.9em; color: #888; margin-right: 1px;">' + monthLabels[m] + '</div>';
                     lastMonth = m;
                 } else {
-                    html += '<div style="width: 13px; margin-right: 1px;"></div>';
+                    html += '<div style="width: 18px; margin-right: 1px;"></div>';
                 }
             }
             html += '</div>';
             // Grid
             html += '<div style="display: flex;">';
-            html += '<div style="display: flex; flex-direction: column; margin-right: 0.3em;">';
-            dayLabels.forEach(l => { html += '<div style="height: 13px; width: 2em; font-size: 0.8em; color: #888; line-height: 13px;">' + l + '</div>'; });
+            // Day labels (all 7, full names, aligned left)
+            html += '<div style="display: flex; flex-direction: column; margin-right: 0.4em;">';
+            dayLabels.forEach(l => { html += '<div style="height: 18px; width: 4em; font-size: 0.85em; color: #888; line-height: 18px; text-align: left;">' + l + '</div>'; });
             html += '</div>';
+            // Weeks
             for (let w = 0; w < 53; w++) {
                 html += '<div style="display: flex; flex-direction: column;">';
                 for (let d = 0; d < 7; d++) {
                     const cellDate = new Date(startDate);
                     cellDate.setDate(cellDate.getDate() + w * 7 + d);
                     if (cellDate > today) {
-                        html += '<div style="width: 13px; height: 13px; margin: 1px; background: transparent;"></div>';
+                        html += '<div style="width: 18px; height: 18px; margin: 1px; background: transparent;"></div>';
                     } else {
                         const dateStr = cellDate.toISOString().substring(0, 10);
                         const count = map[dateStr] || 0;
                         const bg = heatColor(count);
-                        html += '<div style="width: 13px; height: 13px; margin: 1px; background: ' + bg + '; border-radius: 2px;" title="' + dateStr + ': ' + count + ' reproducciones"></div>';
+                        html += '<div style="width: 18px; height: 18px; margin: 1px; background: ' + bg + '; border-radius: 3px;" title="' + dateStr + ': ' + count + ' reproducciones"></div>';
                     }
                 }
                 html += '</div>';
             }
             html += '</div></div>';
-            // Legend with dynamic scale
-            html += '<div style="margin-top: 0.5em; display: flex; align-items: center; gap: 0.3em; font-size: 0.85em; color: #888;">Menos';
+
+            // Right: max/min stats (similar style to Racha)
+            html += '<div style="text-align: center; align-self: center;">';
+            if (maxEntry) {
+                html += '<div style="font-size: 1.4em; font-weight: 700; color: #00a4dc;">' + maxEntry.count + '</div>';
+                html += '<div style="font-size: 0.9em; color: #ccc;">plays el ' + formatDate(maxEntry.date) + '</div>';
+                html += '<div class="fieldDescription" style="margin-top: 0.3em; font-weight: 600; color: #aaa;">Máximo</div>';
+            }
+            html += '<div style="margin-top: 1em;">';
+            if (minEntry) {
+                html += '<div style="font-size: 1.4em; font-weight: 700; color: #f08040;">' + minEntry.count + '</div>';
+                html += '<div style="font-size: 0.9em; color: #ccc;">plays el ' + formatDate(minEntry.date) + '</div>';
+                html += '<div class="fieldDescription" style="margin-top: 0.3em; font-weight: 600; color: #aaa;">Mínimo</div>';
+            }
+            html += '</div></div>';
+            html += '</div>'; // end flex
+
+            // Legend (inverted: dark = max, light = min)
+            html += '<div style="margin-top: 0.5em; display: flex; align-items: center; gap: 0.3em; font-size: 0.9em; color: #888;">Menos';
             for (let i = 0; i <= 5; i++) {
                 const ratio = i / 5;
-                const lightness = 15 + ratio * 40;
-                html += '<div style="width: 13px; height: 13px; background: hsl(140, 100%, ' + lightness + '%); border-radius: 2px;"></div>';
+                const lightness = 55 - ratio * 40;
+                html += '<div style="width: 18px; height: 18px; background: hsl(140, 100%, ' + lightness + '%); border-radius: 3px;"></div>';
             }
-            html += 'Más (máx: ' + maxCount + ')</div>';
+            html += 'Más</div>';
             container.innerHTML = html;
         }
 
@@ -1437,19 +1478,19 @@
             const ctx = document.getElementById('chartByHour');
             if (!ctx) return;
             if (byHourChart) byHourChart.destroy();
+            // Colors in groups of 6 hours
+            function hourColor(h) {
+                if (h < 6) return 'rgba(40, 60, 120, 0.8)';    // 0-5: night blue
+                if (h < 12) return 'rgba(0, 164, 220, 0.8)';   // 6-11: morning cyan
+                if (h < 18) return 'rgba(240, 180, 40, 0.8)';  // 12-17: afternoon gold
+                return 'rgba(200, 80, 60, 0.8)';                // 18-23: evening red
+            }
             byHourChart = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: data.map(d => String(d.hour)), datasets: [{ label: 'Reproducciones', data: data.map(d => d.count), backgroundColor: data.map((d, i) => {
-                    // Color gradient: cool at night (0-6), warm during day (7-19), cool again (20-23)
-                    const h = d.hour;
-                    if (h < 6 || h >= 22) return 'rgba(40, 60, 120, 0.8)'; // Night blue
-                    if (h < 12) return 'rgba(0, 164, 220, 0.8)'; // Morning cyan
-                    if (h < 18) return 'rgba(240, 180, 40, 0.8)'; // Afternoon gold
-                    return 'rgba(200, 80, 60, 0.8)'; // Evening red
-                }) }] },
+                data: { labels: data.map(d => d.hour + ':00 hrs'), datasets: [{ label: 'Reproducciones', data: data.map(d => d.count), backgroundColor: data.map(d => hourColor(d.hour)) }] },
                 options: {
                     responsive: true,
-                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } },
+                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 }, callbacks: { title: (items) => items[0].label } } },
                     scales: {
                         x: { title: { display: true, text: 'Hora del día', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 }, callback: function(v, i) { return data[i].hour + 'h'; } }, grid: { color: '#333' } },
                         y: { title: { display: true, text: 'Reproducciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } }
@@ -1462,12 +1503,13 @@
             const ctx = document.getElementById('chartByDay');
             if (!ctx) return;
             if (byDayChart) byDayChart.destroy();
+            const fullNames = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'];
             byDayChart = new Chart(ctx, {
                 type: 'bar',
-                data: { labels: data.map(d => d.dayName), datasets: [{ label: 'Reproducciones', data: data.map(d => d.count), backgroundColor: ['rgba(0,164,220,0.8)', 'rgba(0,200,180,0.8)', 'rgba(0,220,140,0.8)', 'rgba(100,220,80,0.8)', 'rgba(200,200,40,0.8)', 'rgba(240,160,20,0.8)', 'rgba(240,80,40,0.8)'] }] },
+                data: { labels: data.map(d => fullNames[d.day]), datasets: [{ label: 'Reproducciones', data: data.map(d => d.count), backgroundColor: ['rgba(0,164,220,0.8)', 'rgba(0,200,180,0.8)', 'rgba(0,220,140,0.8)', 'rgba(100,220,80,0.8)', 'rgba(200,200,40,0.8)', 'rgba(240,160,20,0.8)', 'rgba(240,80,40,0.8)'] }] },
                 options: {
                     responsive: true,
-                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 } } },
+                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 }, callbacks: { title: (items) => fullNames[data[items[0].dataIndex].day] } } },
                     scales: {
                         x: { title: { display: true, text: 'Día de la semana', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } },
                         y: { title: { display: true, text: 'Reproducciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } }
@@ -1476,45 +1518,75 @@
             });
         }
 
-        function renderTreemap(data) {
-            const container = document.getElementById('chartTreemapContainer');
-            if (!container) return;
-            if (!data || data.length === 0) { container.innerHTML = '<div class="fieldDescription">Sin datos.</div>'; return; }
+        let genresChart = null, decadesChart = null, artistsChart = null;
+
+        function renderGenres(data) {
+            const ctx = document.getElementById('chartGenres');
+            if (!ctx) return;
+            if (genresChart) genresChart.destroy();
+            if (!data || data.length === 0) return;
             const total = data.reduce((s, d) => s + d.plays, 0);
+            const labels = data.map(d => d.name === 'Otros' ? 'Demás Géneros' : d.name);
+            const pcts = data.map(d => (d.plays / total * 100));
             const colors = ['#00a4dc', '#00c8a0', '#7bc840', '#f0c040', '#f08040', '#e04060', '#a040c0', '#4060e0', '#40c0e0', '#80c080', '#666'];
-            let html = '<div style="display: flex; flex-wrap: wrap; gap: 2px; height: 200px;">';
-            data.forEach((d, i) => {
-                const pct = (d.plays / total * 100);
-                const flex = Math.max(1, pct / 2);
-                const color = colors[i % colors.length];
-                html += '<div style="flex: ' + flex + '; background: ' + color + '; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0.3em; min-width: 60px; cursor: pointer;" title="' + escapeHtml(d.name) + ': ' + d.plays + ' plays (' + pct.toFixed(1) + '%)">';
-                html += '<span style="font-size: 0.85em; font-weight: 600; color: #fff; text-align: center;">' + escapeHtml(d.name) + '</span>';
-                html += '<span style="font-size: 0.75em; color: rgba(255,255,255,0.8);">' + pct.toFixed(0) + '%</span>';
-                html += '</div>';
+            genresChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels, datasets: [{ label: '% del total', data: pcts, backgroundColor: data.map((d, i) => colors[i % colors.length]) }] },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 }, callbacks: { label: (ctx) => ctx.parsed.x.toFixed(1) + '% (' + data[ctx.dataIndex].plays + ' plays)' } } },
+                    scales: { x: { title: { display: true, text: 'Porcentaje', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 }, callback: (v) => v + '%' }, grid: { color: '#333' } }, y: { ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } } }
+                }
             });
-            html += '</div>';
-            container.innerHTML = html;
         }
 
-        function renderBubbles(data) {
-            const ctx = document.getElementById('chartBubbles');
+        function renderDecades(data) {
+            const ctx = document.getElementById('chartDecades');
             if (!ctx) return;
-            if (bubblesChart) bubblesChart.destroy();
+            if (decadesChart) decadesChart.destroy();
             if (!data || data.length === 0) return;
-            const maxDur = Math.max(...data.map(d => d.durationMs || 1));
-            bubblesChart = new Chart(ctx, {
-                type: 'bubble',
-                data: { datasets: [{ label: 'Artistas', data: data.map(d => ({ x: d.totalPlays, y: d.distinctSongs, r: Math.max(5, Math.sqrt((d.durationMs || 0) / maxDur) * 30) })), backgroundColor: 'rgba(0,164,220,0.6)', borderColor: '#00a4dc' }] },
+            const colors = ['rgba(100,100,200,0.8)', 'rgba(100,180,220,0.8)', 'rgba(0,164,220,0.8)', 'rgba(0,200,180,0.8)', 'rgba(0,220,140,0.8)', 'rgba(100,220,80,0.8)', 'rgba(200,200,40,0.8)', 'rgba(240,160,20,0.8)', 'rgba(240,80,40,0.8)', 'rgba(200,40,80,0.8)'];
+            decadesChart = new Chart(ctx, {
+                type: 'bar',
+                data: { labels: data.map(d => d.label), datasets: [{ label: 'Reproducciones', data: data.map(d => d.plays), backgroundColor: data.map((d, i) => colors[i % colors.length]) }] },
                 options: {
                     responsive: true,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: { callbacks: { label: (ctx) => {
-                            const d = data[ctx.dataIndex];
-                            return d.artist + ': ' + d.totalPlays + ' plays, ' + d.distinctSongs + ' canciones, ' + formatDuration(d.durationMs || 0);
-                        } } }
-                    },
-                    scales: { x: { title: { display: true, text: 'Reproducciones totales', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } }, y: { title: { display: true, text: 'Canciones distintas', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } } }
+                    plugins: { legend: { display: false }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 }, callbacks: { label: (ctx) => data[ctx.dataIndex].plays + ' reproducciones' } } },
+                    scales: { x: { title: { display: true, text: 'Década', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, grid: { color: '#333' } }, y: { title: { display: true, text: 'Reproducciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } } }
+                }
+            });
+        }
+
+        function renderArtists(data) {
+            const ctx = document.getElementById('chartArtists');
+            if (!ctx) return;
+            if (artistsChart) artistsChart.destroy();
+            if (!data || data.length === 0) return;
+            // Top 10 artists, grouped bar with 3 metrics
+            const top10 = data.slice(0, 10);
+            const labels = top10.map(d => d.artist);
+            // Normalize duration to plays scale for visibility (hours)
+            const durationsHours = top10.map(d => Math.round((d.durationMs || 0) / 3600000));
+            artistsChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: 'Reproducciones', data: top10.map(d => d.totalPlays), backgroundColor: 'rgba(0,164,220,0.8)' },
+                        { label: 'Canciones distintas', data: top10.map(d => d.distinctSongs), backgroundColor: 'rgba(0,200,140,0.8)' },
+                        { label: 'Horas escuchadas', data: durationsHours, backgroundColor: 'rgba(240,180,40,0.8)' }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    plugins: { legend: { labels: { color: '#ccc', font: { size: 14 } }, tooltip: { titleFont: { size: 16 }, bodyFont: { size: 16 }, callbacks: { label: (ctx) => {
+                        const d = top10[ctx.dataIndex];
+                        if (ctx.datasetIndex === 0) return 'Reproducciones: ' + d.totalPlays;
+                        if (ctx.datasetIndex === 1) return 'Canciones distintas: ' + d.distinctSongs;
+                        return 'Tiempo escuchado: ' + formatDuration(d.durationMs || 0);
+                    } } } } },
+                    scales: { x: { ticks: { color: '#aaa', font: { size: 12 }, maxRotation: 45, minRotation: 30 }, grid: { color: '#333' } }, y: { title: { display: true, text: 'Cantidad', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } } }
                 }
             });
         }
@@ -1529,78 +1601,91 @@
         }
 
         async function loadPortadas() {
-            // Album of month (top 3 albums last month)
+            const win = document.getElementById('chartWindow').value;
+
+            // Album of month (top 3 albums from last month via TopAlbums endpoint)
             try {
-                const r = await apiGet('/Query?dimension=Albums&direction=Top&window=1m&limit=3');
-                if (r.success && r.rows.length > 0) {
+                const r = await apiGet('/Charts/TopAlbums?window=1m&limit=3');
+                if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('albumOfMonthContainer');
                     let html = '';
-                    const sizes = [180, 140, 110];
-                    r.rows.forEach((album, i) => {
-                        if (!album.ItemId) return; // albums don't have ItemId in aggregated queries
+                    const sizes = [200, 160, 120];
+                    r.data.forEach((album, i) => {
                         const size = sizes[i] || 100;
-                        const img = imageUrl(album.ItemId, size * 2);
+                        const itemId = album.albumItemId || '';
+                        const img = itemId ? imageUrl(itemId, size * 2) : '';
                         html += '<div style="text-align: center;">';
-                        if (img) html += '<img src="' + img + '" style="width: ' + size + 'px; height: ' + size + 'px; border-radius: 6px; object-fit: cover;" onerror="this.style.display=\'none\'" />';
-                        else html += '<div style="width: ' + size + 'px; height: ' + size + 'px; background: #333; border-radius: 6px; display: flex; align-items: center; justify-content: center;"><span class="material-icons" style="font-size: 2em; color: #666;">album</span></div>';
-                        html += '<div style="font-weight: 600; margin-top: 0.3em;">' + escapeHtml(album.Name) + '</div>';
-                        if (album.Artist) html += '<div class="fieldDescription">' + escapeHtml(album.Artist) + '</div>';
-                        html += '<div class="fieldDescription">' + album.PlayCount + ' reproducciones</div>';
+                        if (img) html += '<img src="' + img + '" style="width: ' + size + 'px; height: ' + size + 'px; border-radius: 6px; object-fit: cover; background: #333;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:' + size + 'px;height:' + size + 'px;background:#333;border-radius:6px;display:none;align-items:center;justify-content:center;margin:0 auto;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
+                        else html += '<div style="width:' + size + 'px;height:' + size + 'px;background:#333;border-radius:6px;display:flex;align-items:center;justify-content:center;margin:0 auto;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
+                        html += '<div style="font-weight: 600; margin-top: 0.3em;">' + escapeHtml(album.albumName || '(Sin álbum)') + '</div>';
+                        if (album.albumArtist) html += '<div class="fieldDescription">' + escapeHtml(album.albumArtist) + '</div>';
+                        html += '<div class="fieldDescription">' + album.playCount + ' reproducciones</div>';
                         html += '</div>';
                     });
-                    container.innerHTML = html || '<div class="fieldDescription">Sin datos.</div>';
+                    container.innerHTML = html;
+                } else {
+                    document.getElementById('albumOfMonthContainer').innerHTML = '<div class="fieldDescription">Sin datos para el último mes.</div>';
                 }
             } catch (e) {}
 
-            // Artist of month (top 3 artists last month) — need itemIds, use Songs dimension
+            // Artist of month (top 3 artists from last month via TopArtists endpoint)
             try {
-                const r = await apiGet('/Query?dimension=Artists&direction=Top&window=1m&limit=3');
-                if (r.success && r.rows.length > 0) {
+                const r = await apiGet('/Charts/TopArtists?window=1m&limit=3');
+                if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('artistOfMonthContainer');
                     let html = '';
-                    const sizes = [180, 140, 110];
-                    r.rows.forEach((artist, i) => {
+                    const sizes = [200, 160, 120];
+                    r.data.forEach((artist, i) => {
                         const size = sizes[i] || 100;
+                        const itemId = artist.artistItemId || '';
+                        const img = itemId ? imageUrl(itemId, size * 2) : '';
                         html += '<div style="text-align: center;">';
-                        html += '<div style="width: ' + size + 'px; height: ' + size + 'px; background: #333; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto;"><span class="material-icons" style="font-size: 2em; color: #666;">person</span></div>';
-                        html += '<div style="font-weight: 600; margin-top: 0.3em;">' + escapeHtml(artist.Name) + '</div>';
-                        html += '<div class="fieldDescription">' + artist.PlayCount + ' reproducciones</div>';
+                        if (img) html += '<img src="' + img + '" style="width: ' + size + 'px; height: ' + size + 'px; border-radius: 50%; object-fit: cover; background: #333;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:' + size + 'px;height:' + size + 'px;background:#333;border-radius:50%;display:none;align-items:center;justify-content:center;margin:0 auto;"><span class="material-icons" style="font-size:2em;color:#666">person</span></div>';
+                        else html += '<div style="width:' + size + 'px;height:' + size + 'px;background:#333;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto;"><span class="material-icons" style="font-size:2em;color:#666">person</span></div>';
+                        html += '<div style="font-weight: 600; margin-top: 0.3em;">' + escapeHtml(artist.artist) + '</div>';
+                        html += '<div class="fieldDescription">' + artist.playCount + ' reproducciones · ' + artist.distinctSongs + ' canciones · ' + formatDuration(artist.durationMs || 0) + '</div>';
                         html += '</div>';
                     });
-                    container.innerHTML = html || '<div class="fieldDescription">Sin datos.</div>';
+                    container.innerHTML = html;
+                } else {
+                    document.getElementById('artistOfMonthContainer').innerHTML = '<div class="fieldDescription">Sin datos para el último mes.</div>';
                 }
             } catch (e) {}
 
-            // Album collage (top 50 albums, 12 months)
+            // Album collage (top 25 albums from selected window, 320px)
             try {
-                const r = await apiGet('/Query?dimension=Songs&direction=Top&window=12m&limit=50');
-                if (r.success && r.rows.length > 0) {
+                const r = await apiGet('/Charts/TopAlbums?window=' + win + '&limit=25');
+                if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('albumCollageContainer');
                     let html = '';
-                    const seen = new Set();
-                    r.rows.forEach(song => {
-                        if (!song.ItemId) return;
-                        const img = imageUrl(song.ItemId, 160);
-                        html += '<div style="text-align: center; cursor: pointer;" title="' + escapeHtml(song.Name) + ' — ' + escapeHtml(song.Artist || '') + ' (' + song.PlayCount + ')">';
-                        if (img) html += '<img src="' + img + '" style="width: 80px; height: 80px; border-radius: 4px; object-fit: cover;" onerror="this.src=\'\';this.style.background=\'#333\';this.style.borderRadius=\'4px\'" />';
-                        else html += '<div style="width: 80px; height: 80px; background: #333; border-radius: 4px;"></div>';
+                    r.data.forEach(album => {
+                        const itemId = album.albumItemId || '';
+                        const img = itemId ? imageUrl(itemId, 320) : '';
+                        const title = escapeHtml(album.albumName || '') + (album.albumArtist ? ' — ' + escapeHtml(album.albumArtist) : '') + ' (' + album.playCount + ' plays)';
+                        html += '<div style="text-align: center; cursor: pointer;" title="' + title + '">';
+                        if (img) html += '<img src="' + img + '" style="width: 100%; max-width: 320px; aspect-ratio: 1; border-radius: 6px; object-fit: cover; background: #333;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:none;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
+                        else html += '<div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
                         html += '</div>';
                     });
-                    container.innerHTML = html || '<div class="fieldDescription">Sin datos.</div>';
+                    container.innerHTML = html;
+                } else {
+                    document.getElementById('albumCollageContainer').innerHTML = '<div class="fieldDescription">Sin datos.</div>';
                 }
             } catch (e) {}
 
-            // Discoveries (songs first seen in last month) — need new API endpoint
+            // Discoveries (songs first seen in last month, 25 results, 320px)
             try {
                 const r = await apiGet('/Charts/Discoveries?months=1');
                 if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('discoveriesContainer');
                     let html = '';
-                    r.data.forEach(song => {
-                        const img = imageUrl(song.itemId, 160);
-                        html += '<div style="text-align: center; cursor: pointer;" title="' + escapeHtml(song.name) + ' — ' + escapeHtml(song.albumArtist || '') + '">';
-                        if (img) html += '<img src="' + img + '" style="width: 80px; height: 80px; border-radius: 4px; object-fit: cover;" onerror="this.style.background=\'#333\';this.style.borderRadius=\'4px\';this.removeAttribute(\'src\')" />';
-                        else html += '<div style="width: 80px; height: 80px; background: #333; border-radius: 4px;"></div>';
+                    const top25 = r.data.slice(0, 25);
+                    top25.forEach(song => {
+                        const img = song.itemId ? imageUrl(song.itemId, 320) : '';
+                        const title = escapeHtml(song.name || '') + (song.albumArtist ? ' — ' + escapeHtml(song.albumArtist) : '');
+                        html += '<div style="text-align: center; cursor: pointer;" title="' + title + '">';
+                        if (img) html += '<img src="' + img + '" style="width: 100%; max-width: 320px; aspect-ratio: 1; border-radius: 6px; object-fit: cover; background: #333;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:none;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">music_note</span></div>';
+                        else html += '<div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">music_note</span></div>';
                         html += '</div>';
                     });
                     container.innerHTML = html;
