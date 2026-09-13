@@ -68,8 +68,15 @@ public sealed class ChartService
         var cacheKey = $"Chart:Heatmap:{months}";
         return _cache.GetOrSet(cacheKey, () =>
         {
-            var end = DateTime.UtcNow;
-            var start = end.AddDays(-months * 30);
+            // Use the start of the current week (Sunday) as the end boundary,
+            // so we exclude the current in-progress week — consistent with all
+            // other queries that exclude the current period.
+            var nowLocal = ServerClock.NowLocal();
+            var daysSinceSunday = (int)nowLocal.DayOfWeek; // Sunday=0
+            var endExclusive = nowLocal.Date.AddDays(-daysSinceSunday); // This Sunday 00:00 local
+            var start = endExclusive.AddDays(-months * 30);
+            var startUtc = ServerClock.ToUtc(start).ToString("o");
+            var endUtc = ServerClock.ToUtc(endExclusive).ToString("o");
             var result = new List<Dictionary<string, object>>();
             using var conn = _db.OpenMain();
             using var cmd = conn.CreateCommand();
@@ -78,8 +85,8 @@ public sealed class ChartService
                 FROM plays
                 WHERE played_at >= @start AND played_at < @end
                 GROUP BY day ORDER BY day;";
-            cmd.Parameters.AddWithValue("@start", start.ToString("o"));
-            cmd.Parameters.AddWithValue("@end", end.ToString("o"));
+            cmd.Parameters.AddWithValue("@start", startUtc);
+            cmd.Parameters.AddWithValue("@end", endUtc);
             using var reader = cmd.ExecuteReader();
             while (reader.Read())
             {

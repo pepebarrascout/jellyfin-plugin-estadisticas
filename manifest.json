@@ -9,6 +9,14 @@
     "imageUrl": "https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-estadisticas/main/logo.png",
     "versions": [
       {
+        "version": "0.0.0.17",
+        "changelog": "- NEW: Script resolve_item_ids.py para llenar album_item_id y artist_item_id.\n- FIXED: Portadas con selector de ventana temporal propio.\n- FIXED: Álbum/artista del período con formato detallado en líneas separadas.\n- FIXED: Collage 25 álbumes, 320px, tooltip con artista.\n- FIXED: Heatmap excluye semana actual, max/min correctos.\n- FIXED: Géneros Musicales barras más anchas.\n- FIXED: Artistas con eje Y dual (plays/songs izq, tiempo der HH:MM:SS).\n- FIXED: Formato fecha dd-MM-yyyy.",
+        "targetAbi": "10.11.0.0",
+        "sourceUrl": "https://github.com/pepebarrascout/jellyfin-plugin-estadisticas/releases/download/v0.0.0.17/jellyfin-plugin-estadisticas_0.0.0.17.zip",
+        "checksum": "C8F6C5EEFEE1645CFBD1BDD8EE9EB45C",
+        "timestamp": "2026-09-13T03:00:00Z"
+      },
+      {
         "version": "0.0.0.16",
         "changelog": "- NEW: Logros movido a Gráficos > Retos. Gamificación renombrada a Retos.\n- FIXED: Timeline sin interpolación.\n- FIXED: Heatmap: colores invertidos, cuadros grandes, 7 días completos, max/min display.\n- FIXED: ByHour: colores grupos 6h, tooltip '13:00 hrs'.\n- FIXED: ByDay: tooltip nombre completo.\n- NEW: Treemap→barras horizontal 'Géneros Musicales' + 'Demás Géneros'.\n- NEW: Gráfica Décadas. Lado a lado con Géneros.\n- NEW: Bubble→grouped bar 'Artistas - Descubrimientos' (10 artistas, 3 métricas).\n- NEW: Portadas con API Jellyfin images, 320px, 25 álbumes, tooltips.\n- NEW: album_item_id + artist_item_id en tracks (cache de Jellyfin ItemIds).\n- NEW: Endpoints /Charts/Decades, /Charts/TopAlbums, /Charts/TopArtists.",
         "targetAbi": "10.11.0.0",

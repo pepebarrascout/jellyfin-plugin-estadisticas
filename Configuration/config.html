@@ -334,13 +334,13 @@
                         <div style="flex: 1; min-width: 20em;">
                             <h3>Géneros Musicales</h3>
                             <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
-                                <canvas id="chartGenres" height="120"></canvas>
+                                <canvas id="chartGenres" height="250"></canvas>
                             </div>
                         </div>
                         <div style="flex: 1; min-width: 20em;">
                             <h3>Décadas</h3>
                             <div style="background: #1a1a1a; border-radius: 6px; padding: 1em;">
-                                <canvas id="chartDecades" height="120"></canvas>
+                                <canvas id="chartDecades" height="250"></canvas>
                             </div>
                         </div>
                     </div>
@@ -353,13 +353,30 @@
 
                 <!-- Sub-tab: Portadas -->
                 <div id="subtab-portadas" class="graficoSubPanel" style="display: none;">
-                    <h3>Álbum del mes</h3>
+                    <div style="display: flex; gap: 1em; flex-wrap: wrap; align-items: flex-end; margin-bottom: 1em;">
+                        <div class="selectContainer" style="flex: 0.5; min-width: 10em;">
+                            <label class="selectLabel" for="portadasWindow">Ventana temporal</label>
+                            <select is="emby-select" id="portadasWindow" class="emby-select-withcolor emby-select">
+                                <option value="2w">Últimas 2 semanas</option>
+                                <option value="1m" selected>Último mes</option>
+                                <option value="3m">Últimos 3 meses</option>
+                                <option value="6m">Últimos 6 meses</option>
+                                <option value="12m">Últimos 12 meses</option>
+                                <option value="last_year">Año anterior</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-bottom: 1em;">
+                        <button is="emby-button" type="button" class="raised button-submit block" id="portadasRefresh">Actualizar portadas</button>
+                    </div>
+
+                    <h3>Álbum del período</h3>
                     <div id="albumOfMonthContainer" style="display: flex; gap: 1em; flex-wrap: wrap; margin-bottom: 2em;"></div>
 
-                    <h3>Artista del mes</h3>
+                    <h3>Artista del período</h3>
                     <div id="artistOfMonthContainer" style="display: flex; gap: 1em; flex-wrap: wrap; margin-bottom: 2em;"></div>
 
-                    <h3>Collage de Top 50 álbumes (últimos 12 meses)</h3>
+                    <h3>Collage de Top 25 álbumes</h3>
                     <div id="albumCollageContainer" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)); gap: 0.5em; margin-bottom: 2em;"></div>
 
                     <h3>Descubrimientos recientes (último mes)</h3>
@@ -414,12 +431,11 @@
         function formatDate(iso) {
             if (!iso) return '';
             try {
-                // Date-only strings ("2026-08-31") se formatean directamente (sin aritmética de zonas)
                 const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso));
-                if (m) return m[3] + '-' + MONTHS_ES[(parseInt(m[2], 10) || 1) - 1] + '-' + m[1];
+                if (m) return m[3] + '-' + m[2] + '-' + m[1];
                 const d = new Date(iso);
                 if (isNaN(d.getTime())) return iso;
-                return pad2(d.getUTCDate()) + '-' + MONTHS_ES[d.getUTCMonth()] + '-' + d.getUTCFullYear();
+                return pad2(d.getUTCDate()) + '-' + pad2(d.getUTCMonth() + 1) + '-' + d.getUTCFullYear();
             } catch (e) { return iso; }
         }
         function formatDateTime(iso) {
@@ -1299,6 +1315,12 @@
             });
         });
 
+        // Portadas refresh button + window selector
+        const portadasRefreshBtn = document.getElementById('portadasRefresh');
+        if (portadasRefreshBtn) portadasRefreshBtn.addEventListener('click', loadPortadas);
+        const portadasWindowSel = document.getElementById('portadasWindow');
+        if (portadasWindowSel) portadasWindowSel.addEventListener('change', loadPortadas);
+
         async function loadCharts() {
             const win = document.getElementById('chartWindow').value;
             loadChartJs(() => renderAllCharts(win));
@@ -1563,19 +1585,18 @@
             if (!ctx) return;
             if (artistsChart) artistsChart.destroy();
             if (!data || data.length === 0) return;
-            // Top 10 artists, grouped bar with 3 metrics
             const top10 = data.slice(0, 10);
             const labels = top10.map(d => d.artist);
-            // Normalize duration to plays scale for visibility (hours)
-            const durationsHours = top10.map(d => Math.round((d.durationMs || 0) / 3600000));
+            // Duration in seconds for the right Y-axis
+            const durationsSec = top10.map(d => Math.round((d.durationMs || 0) / 1000));
             artistsChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels,
                     datasets: [
-                        { label: 'Reproducciones', data: top10.map(d => d.totalPlays), backgroundColor: 'rgba(0,164,220,0.8)' },
-                        { label: 'Canciones distintas', data: top10.map(d => d.distinctSongs), backgroundColor: 'rgba(0,200,140,0.8)' },
-                        { label: 'Horas escuchadas', data: durationsHours, backgroundColor: 'rgba(240,180,40,0.8)' }
+                        { label: 'Reproducciones', data: top10.map(d => d.totalPlays), backgroundColor: 'rgba(0,164,220,0.8)', yAxisID: 'y' },
+                        { label: 'Canciones distintas', data: top10.map(d => d.distinctSongs), backgroundColor: 'rgba(0,200,140,0.8)', yAxisID: 'y' },
+                        { label: 'Tiempo escuchado', data: durationsSec, backgroundColor: 'rgba(240,180,40,0.8)', yAxisID: 'y1' }
                     ]
                 },
                 options: {
@@ -1586,7 +1607,15 @@
                         if (ctx.datasetIndex === 1) return 'Canciones distintas: ' + d.distinctSongs;
                         return 'Tiempo escuchado: ' + formatDuration(d.durationMs || 0);
                     } } } } },
-                    scales: { x: { ticks: { color: '#aaa', font: { size: 12 }, maxRotation: 45, minRotation: 30 }, grid: { color: '#333' } }, y: { title: { display: true, text: 'Cantidad', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } } }
+                    scales: {
+                        x: { ticks: { color: '#aaa', font: { size: 12 }, maxRotation: 45, minRotation: 30 }, grid: { color: '#333' } },
+                        y: { type: 'linear', position: 'left', title: { display: true, text: 'Reproducciones / Canciones', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 } }, beginAtZero: true, grid: { color: '#333' } },
+                        y1: { type: 'linear', position: 'right', title: { display: true, text: 'Tiempo (HH:MM:SS)', color: '#ccc', font: { size: 14 } }, ticks: { color: '#aaa', font: { size: 13 }, callback: (v) => {
+                            const h = Math.floor(v / 3600); const m = Math.floor((v % 3600) / 60); const s = v % 60;
+                            const pad2 = (n) => (n < 10 ? '0' : '') + n;
+                            return pad2(h) + ':' + pad2(m) + ':' + pad2(s);
+                        } }, beginAtZero: true, grid: { drawOnChartArea: false } }
+                    }
                 }
             });
         }
@@ -1601,11 +1630,11 @@
         }
 
         async function loadPortadas() {
-            const win = document.getElementById('chartWindow').value;
+            const win = document.getElementById('portadasWindow').value;
 
-            // Album of month (top 3 albums from last month via TopAlbums endpoint)
+            // Álbum del período (top 3, con nombre de artista en línea separada)
             try {
-                const r = await apiGet('/Charts/TopAlbums?window=1m&limit=3');
+                const r = await apiGet('/Charts/TopAlbums?window=' + win + '&limit=3');
                 if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('albumOfMonthContainer');
                     let html = '';
@@ -1624,13 +1653,13 @@
                     });
                     container.innerHTML = html;
                 } else {
-                    document.getElementById('albumOfMonthContainer').innerHTML = '<div class="fieldDescription">Sin datos para el último mes.</div>';
+                    document.getElementById('albumOfMonthContainer').innerHTML = '<div class="fieldDescription">Sin datos para el período seleccionado.</div>';
                 }
             } catch (e) {}
 
-            // Artist of month (top 3 artists from last month via TopArtists endpoint)
+            // Artista del período (top 3, con stats detalladas)
             try {
-                const r = await apiGet('/Charts/TopArtists?window=1m&limit=3');
+                const r = await apiGet('/Charts/TopArtists?window=' + win + '&limit=3');
                 if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('artistOfMonthContainer');
                     let html = '';
@@ -1643,28 +1672,31 @@
                         if (img) html += '<img src="' + img + '" style="width: ' + size + 'px; height: ' + size + 'px; border-radius: 50%; object-fit: cover; background: #333;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:' + size + 'px;height:' + size + 'px;background:#333;border-radius:50%;display:none;align-items:center;justify-content:center;margin:0 auto;"><span class="material-icons" style="font-size:2em;color:#666">person</span></div>';
                         else html += '<div style="width:' + size + 'px;height:' + size + 'px;background:#333;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto;"><span class="material-icons" style="font-size:2em;color:#666">person</span></div>';
                         html += '<div style="font-weight: 600; margin-top: 0.3em;">' + escapeHtml(artist.artist) + '</div>';
-                        html += '<div class="fieldDescription">' + artist.playCount + ' reproducciones · ' + artist.distinctSongs + ' canciones · ' + formatDuration(artist.durationMs || 0) + '</div>';
+                        html += '<div class="fieldDescription">' + artist.playCount + ' reproducciones</div>';
+                        html += '<div class="fieldDescription">' + artist.distinctSongs + ' canciones</div>';
+                        html += '<div class="fieldDescription">' + formatDuration(artist.durationMs || 0) + '</div>';
                         html += '</div>';
                     });
                     container.innerHTML = html;
                 } else {
-                    document.getElementById('artistOfMonthContainer').innerHTML = '<div class="fieldDescription">Sin datos para el último mes.</div>';
+                    document.getElementById('artistOfMonthContainer').innerHTML = '<div class="fieldDescription">Sin datos para el período seleccionado.</div>';
                 }
             } catch (e) {}
 
-            // Album collage (top 25 albums from selected window, 320px)
+            // Collage de Top 25 álbumes (320px, tooltip con álbum + artista + plays)
             try {
                 const r = await apiGet('/Charts/TopAlbums?window=' + win + '&limit=25');
                 if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('albumCollageContainer');
+                    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
                     let html = '';
                     r.data.forEach(album => {
                         const itemId = album.albumItemId || '';
                         const img = itemId ? imageUrl(itemId, 320) : '';
-                        const title = escapeHtml(album.albumName || '') + (album.albumArtist ? ' — ' + escapeHtml(album.albumArtist) : '') + ' (' + album.playCount + ' plays)';
-                        html += '<div style="text-align: center; cursor: pointer;" title="' + title + '">';
-                        if (img) html += '<img src="' + img + '" style="width: 100%; max-width: 320px; aspect-ratio: 1; border-radius: 6px; object-fit: cover; background: #333;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:none;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
-                        else html += '<div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
+                        const title = escapeHtml(album.albumName || '') + (album.albumArtist ? '\n' + escapeHtml(album.albumArtist) : '') + '\n' + album.playCount + ' reproducciones';
+                        html += '<div style="cursor: pointer;" title="' + title + '">';
+                        if (img) html += '<img src="' + img + '" style="width: 320px; height: 320px; border-radius: 6px; object-fit: cover; background: #333; display: block;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:320px;height:320px;background:#333;border-radius:6px;display:none;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
+                        else html += '<div style="width:320px;height:320px;background:#333;border-radius:6px;display:flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">album</span></div>';
                         html += '</div>';
                     });
                     container.innerHTML = html;
@@ -1673,19 +1705,20 @@
                 }
             } catch (e) {}
 
-            // Discoveries (songs first seen in last month, 25 results, 320px)
+            // Descubrimientos (25 resultados, 320px, tooltip con canción + artista)
             try {
                 const r = await apiGet('/Charts/Discoveries?months=1');
                 if (r.success && r.data && r.data.length > 0) {
                     const container = document.getElementById('discoveriesContainer');
+                    container.style.gridTemplateColumns = 'repeat(auto-fill, minmax(320px, 1fr))';
                     let html = '';
                     const top25 = r.data.slice(0, 25);
                     top25.forEach(song => {
                         const img = song.itemId ? imageUrl(song.itemId, 320) : '';
-                        const title = escapeHtml(song.name || '') + (song.albumArtist ? ' — ' + escapeHtml(song.albumArtist) : '');
-                        html += '<div style="text-align: center; cursor: pointer;" title="' + title + '">';
-                        if (img) html += '<img src="' + img + '" style="width: 100%; max-width: 320px; aspect-ratio: 1; border-radius: 6px; object-fit: cover; background: #333;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:none;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">music_note</span></div>';
-                        else html += '<div style="width:100%;max-width:320px;aspect-ratio:1;background:#333;border-radius:6px;display:flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">music_note</span></div>';
+                        const title = escapeHtml(song.name || '') + (song.albumArtist ? '\n' + escapeHtml(song.albumArtist) : '');
+                        html += '<div style="cursor: pointer;" title="' + title + '">';
+                        if (img) html += '<img src="' + img + '" style="width: 320px; height: 320px; border-radius: 6px; object-fit: cover; background: #333; display: block;" onerror="this.style.display=\'none\';this.nextElementSibling.style.display=\'flex\'" /><div style="width:320px;height:320px;background:#333;border-radius:6px;display:none;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">music_note</span></div>';
+                        else html += '<div style="width:320px;height:320px;background:#333;border-radius:6px;display:flex;align-items:center;justify-content:center;"><span class="material-icons" style="font-size:2em;color:#666">music_note</span></div>';
                         html += '</div>';
                     });
                     container.innerHTML = html;
