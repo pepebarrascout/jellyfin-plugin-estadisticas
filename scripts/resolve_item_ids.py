@@ -121,8 +121,9 @@ def main():
 
         # Build map: album_item_id -> artist_item_id (by looking up the album's ParentId)
         # First, get all MusicAlbum items with their ParentIds
+        # NOTE: BaseItems has 'AlbumArtists' (plural, JSON) not 'AlbumArtist' (singular)
         cursor = jf_conn.execute("""
-            SELECT Id, ParentId, Name, AlbumArtist
+            SELECT Id, ParentId, Name, AlbumArtists
             FROM BaseItems
             WHERE Type = 'MediaBrowser.Controller.Entities.Audio.MusicAlbum';
         """)
@@ -132,8 +133,8 @@ def main():
             album_id = row["Id"]
             parent_id = row["ParentId"]
             name = row["Name"]
-            album_artist = row["AlbumArtist"]
-            album_info[album_id] = {"parent_id": parent_id, "name": name, "album_artist": album_artist}
+            album_artists_raw = row["AlbumArtists"]
+            album_info[album_id] = {"parent_id": parent_id, "name": name, "album_artists_raw": album_artists_raw}
             if parent_id:
                 album_to_artist[album_id] = parent_id
 
@@ -173,11 +174,19 @@ def main():
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-            # Another fallback: try matching album_artist field
+            # Another fallback: try matching AlbumArtists JSON field from the album
             if not artist_id and album_id and album_id in album_info:
-                aa = album_info[album_id].get("album_artist")
-                if aa and aa in artist_by_name:
-                    artist_id = artist_by_name[aa]
+                aa_raw = album_info[album_id].get("album_artists_raw")
+                if aa_raw:
+                    import json
+                    try:
+                        artists_list = json.loads(aa_raw)
+                        if isinstance(artists_list, list) and len(artists_list) > 0:
+                            first_name = artists_list[0].get("Name", "")
+                            if first_name and first_name in artist_by_name:
+                                artist_id = artist_by_name[first_name]
+                    except (json.JSONDecodeError, TypeError):
+                        pass
 
             resolved[item_id] = {
                 "album_item_id": album_id,
