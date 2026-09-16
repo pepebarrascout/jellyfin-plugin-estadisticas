@@ -11,7 +11,7 @@
 
 > **Estadísticas de música para Jellyfin**. Registra reproducciones de audio en una **base de datos SQLite propia** (sin tocar la BD de Jellyfin) y genera informes **Top 50** y **Bottom 50** por canción, artista, álbum y género en múltiples ventanas temporales. Permite crear listas de reproducción y programar su publicación de forma diaria, semanal, mensual o anual.
 
-**Requiere Jellyfin versión `10.11.0` o superior.**
+**Requiere Jellyfin versión `10.11.0` o superior (incluyendo 12.x).**
 
 ---
 
