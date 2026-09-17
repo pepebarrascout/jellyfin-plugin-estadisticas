@@ -4,7 +4,7 @@
         <img alt="Logo" src="https://raw.githubusercontent.com/pepebarrascout/jellyfin-plugin-estadisticas/main/logo.png" height="180"/><br />
         <a href="https://github.com/pepebarrascout/jellyfin-plugin-estadisticas/releases"><img alt="Total GitHub Downloads" src="https://img.shields.io/github/downloads/pepebarrascout/jellyfin-plugin-estadisticas/total?color=9b59b6&label=descargas"/></a>
         <a href="https://github.com/pepebarrascout/jellyfin-plugin-estadisticas/issues"><img alt="GitHub Issues" src="https://img.shields.io/github/issues/pepebarrascout/jellyfin-plugin-estadisticas?color=9b59b6"/></a>
-        <a href="https://jellyfin.org/"><img alt="Jellyfin Version" src="https://img.shields.io/badge/Jellyfin-10.11.x-blue.svg"/></a>
+        <a href="https://jellyfin.org/"><img alt="Jellyfin Version" src="https://img.shields.io/badge/Jellyfin-12.1.x-blue.svg"/></a>
         <a href="https://github.com/pepebarrascout/jellyfin-plugin-estadisticas"><img alt="Music Stats" src="https://img.shields.io/badge/Music-Statistics-orange?logo=last.fm&logoColor=white"/></a>
     </p>
 </div>
